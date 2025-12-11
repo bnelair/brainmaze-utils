@@ -108,6 +108,24 @@ _hypnogram_colors = {
 
 
 def load_CyberPSG(path, tile=None, verbose=True):
+    """
+    Load annotations from CyberPSG XML file(s).
+
+    Parameters
+    ----------
+    path : str or list
+        Path to CyberPSG XML file or list of paths for multiple files
+    tile : float, optional
+        Time duration in seconds to tile annotations into fixed-length segments
+    verbose : bool, optional
+        If True, display progress bar for multiple files (default: True)
+
+    Returns
+    -------
+    pandas.DataFrame or list
+        DataFrame with annotation columns (annotation, start, end, duration)
+        or list of DataFrames if multiple paths provided
+    """
     if isinstance(path, list):
         return _load_CyberPSG_dataset(path, tile, verbose)
     else:
@@ -143,6 +161,22 @@ def _load_CyberPSG_dataset(paths: list, tile=None, verbose=True):
 
 
 def save_CyberPSG(path, df):
+    """
+    Save annotations to CyberPSG XML file format.
+
+    Parameters
+    ----------
+    path : str
+        Output path for the CyberPSG XML file
+    df : pandas.DataFrame
+        DataFrame containing annotations with columns: annotation, start, end
+        Optional column: channel (for channel-specific annotations)
+
+    Notes
+    -----
+    TODO: Do Tests
+    TODO: Implement annotation groups etc
+    """
     #TODO: Do Tests
     #TODO: Implement annotation groups etc
 
@@ -178,6 +212,19 @@ def save_CyberPSG(path, df):
 
 
 def load_NSRR(path):
+    """
+    Load sleep stage annotations from NSRR (National Sleep Research Resource) XML file.
+
+    Parameters
+    ----------
+    path : str
+        Path to NSRR XML annotation file
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame with sleep stage annotations
+    """
     return NSRRSleepFile(path).get_hypnogram()
 
 
