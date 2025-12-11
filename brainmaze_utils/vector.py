@@ -20,6 +20,21 @@ def _check_scale(x, m):
 
 
 def translate(x, m):
+    """
+    Translate vectors by given offsets.
+
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Array of vectors with shape (n_points, n_dimensions)
+    m : array-like
+        Translation offsets for each dimension
+
+    Returns
+    -------
+    numpy.ndarray
+        Translated vectors
+    """
     _check_scale(x, m)
     for idx, s in enumerate(m):
         x[:, idx] = x[:, idx] + s
@@ -27,6 +42,21 @@ def translate(x, m):
 
 
 def scale(x, m):
+    """
+    Scale vectors around their mean by given factors.
+
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Array of vectors with shape (n_points, n_dimensions)
+    m : array-like
+        Scale factors for each dimension
+
+    Returns
+    -------
+    numpy.ndarray
+        Scaled vectors
+    """
     _check_scale(x, m)
     sc = np.array(m).reshape(1, -1)
     mn = x.mean(axis=0).reshape(1, -1)
@@ -35,6 +65,22 @@ def scale(x, m):
 
 
 def rotate(x, angl):
+    """
+    Rotate vectors by specified angle(s) around their mean.
+
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Array of vectors with shape (n_points, 2) or (n_points, 3)
+    angl : float or array-like
+        For 2D: single rotation angle in degrees
+        For 3D: array of 3 rotation angles [x, y, z] in degrees
+
+    Returns
+    -------
+    numpy.ndarray
+        Rotated vectors
+    """
     x = deepcopy(x)
     if isinstance(angl, (tuple, np.ndarray, list)):
         if angl.__len__() == 3 and x.shape[1] == 3:
@@ -51,6 +97,19 @@ def _rotate_2d(x, angl):
 
 
 def get_rot_2d(an):
+    """
+    Get 2D rotation matrix for a given angle.
+
+    Parameters
+    ----------
+    an : float
+        Rotation angle in degrees
+
+    Returns
+    -------
+    numpy.ndarray
+        2x2 rotation matrix
+    """
     an = 2*np.pi*an/360
     m = np.array([
         [np.cos(an), -np.sin(an)],
@@ -70,6 +129,19 @@ def _rotate_3d(x, angl):
 
 
 def get_rot_3d(an):
+    """
+    Get 3D rotation matrices for given angles around x, y, and z axes.
+
+    Parameters
+    ----------
+    an : array-like
+        Array of 3 rotation angles [x, y, z] in degrees
+
+    Returns
+    -------
+    list
+        List of three 3x3 rotation matrices [Rx, Ry, Rz]
+    """
     return [
         get_rot_3d_x(an[0]),
         get_rot_3d_y(an[1]),
@@ -78,6 +150,19 @@ def get_rot_3d(an):
 
 
 def get_rot_3d_x(an):
+    """
+    Get 3D rotation matrix for rotation around the x-axis.
+
+    Parameters
+    ----------
+    an : float
+        Rotation angle in degrees
+
+    Returns
+    -------
+    numpy.ndarray
+        3x3 rotation matrix for x-axis rotation
+    """
     an = 2*np.pi*an/360
     m = np.array([
         [1, 0, 0],
@@ -88,6 +173,19 @@ def get_rot_3d_x(an):
 
 
 def get_rot_3d_y(an):
+    """
+    Get 3D rotation matrix for rotation around the y-axis.
+
+    Parameters
+    ----------
+    an : float
+        Rotation angle in degrees
+
+    Returns
+    -------
+    numpy.ndarray
+        3x3 rotation matrix for y-axis rotation
+    """
     an = 2*np.pi*an/360
     m = np.array([
         [np.cos(an), 0, np.sin(an)],
@@ -98,6 +196,19 @@ def get_rot_3d_y(an):
 
 
 def get_rot_3d_z(an):
+    """
+    Get 3D rotation matrix for rotation around the z-axis.
+
+    Parameters
+    ----------
+    an : float
+        Rotation angle in degrees
+
+    Returns
+    -------
+    numpy.ndarray
+        3x3 rotation matrix for z-axis rotation
+    """
     an = 2*np.pi*an/360
     m = np.array([
         [np.cos(an), -np.sin(an), 0],
@@ -108,6 +219,22 @@ def get_rot_3d_z(an):
 
 
 def get_mutual_vectors(x, y=None):
+    """
+    Compute all pairwise difference vectors between points.
+
+    Parameters
+    ----------
+    x : numpy.ndarray
+        Array of vectors with shape (n_points, n_dimensions)
+    y : array-like, optional
+        Labels for the vectors. If provided, returns labels for each pair.
+
+    Returns
+    -------
+    numpy.ndarray or tuple
+        If y is None: array of all pairwise difference vectors
+        If y is provided: tuple of (difference vectors, pair labels)
+    """
     leg = []
     v = []
     for idx, x_ in enumerate(x):

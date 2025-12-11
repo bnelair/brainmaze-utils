@@ -1,2 +1,2 @@
-sphinx==3.0.3
+sphinx>=7.0.0,<10.0.0
 sphinx_book_theme

@@ -419,6 +419,9 @@ class LowFrequencyFilter:
         self.design_filters()
 
     def design_filters(self):
+        """
+        Design decimation and filtering coefficients based on filter type (FIR or IIR).
+        """
         if self.ftype == 'fir':
             if isinstance(self.n_order, type(None)): self.n_order = 101
             self.n_append = (2 * self.n_order) * (2**self.n_decimate)
@@ -441,16 +444,55 @@ class LowFrequencyFilter:
         else: raise AssertionError(f'[INPUT ERROR]: ftype must be \'iir\' or \'fir\'')
 
     def decimate(self, X):
+        """
+        Apply anti-aliasing filter and downsample signal by factor of 2.
+
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Input signal
+
+        Returns
+        -------
+        numpy.ndarray
+            Downsampled signal
+        """
         X = signal.filtfilt(self.b_dec, self.a_dec, X)
         return X[::2]
 
     def upsample(self, X):
+        """
+        Upsample signal by factor of 2 using zero-insertion and filtering.
+
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Input signal
+
+        Returns
+        -------
+        numpy.ndarray
+            Upsampled signal
+        """
         X_up = np.zeros(X.shape[0] * 2)
         X_up[::2] = X
         X_up = signal.filtfilt(self.b_dec, self.a_dec, X_up) * 2
         return X_up
 
     def filter_signal(self, X):
+        """
+        Apply low-frequency filter using decimation/upsampling strategy.
+
+        Parameters
+        ----------
+        X : numpy.ndarray
+            Input signal
+
+        Returns
+        -------
+        numpy.ndarray
+            Filtered signal
+        """
         # append for filter
         X = np.concatenate((np.zeros(self.n_append), X, np.zeros(self.n_append)), axis=0)
 
