@@ -1,0 +1,11 @@
+numpy
+scipy
+pandas
+pytz
+python-dateutil
+
+[test]
+pytest
+sphinx
+sphinx_book_theme
+tqdm
