@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "brainmaze-utils"
-dynamic = ["version"]
+version = "1.0.4"
 description = "BrainMaze: Brain Electrophysiology, Behavior and Dynamics Analysis Toolbox"
 authors = [
     {name = "Filip Mivalt", email = "mivalt.filip@mayo.edu"},
@@ -43,7 +43,7 @@ test = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/bnelair/brainmaze_utils"
+Homepage = "https://github.com/bnelair/brainmaze-utils"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -51,6 +51,3 @@ exclude = ["tests*", "docs*", "docs_src*"]
 
 [tool.setuptools]
 include-package-data = true
-
-[tool.setuptools.dynamic]
-version = {attr = "brainmaze_utils._version.__version__"}
