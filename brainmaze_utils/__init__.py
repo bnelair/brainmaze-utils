@@ -4,4 +4,9 @@ Brainmaze utils (:mod:`brainmaze_utils`)
 =======================================
 
 """
-from brainmaze_utils._version import __version__
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("brainmaze-utils")
+except PackageNotFoundError:
+    __version__ = "0.0.0"
