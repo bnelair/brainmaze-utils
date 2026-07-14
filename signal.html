@@ -370,14 +370,27 @@
 <li><p><strong>n_decimate</strong> (<em>int</em>) – how many times the signal will be downsampled before the low frequency filtering</p></li>
 <li><p><strong>n_order</strong> (<em>int</em>) – n-th order filter used for filtration</p></li>
 <li><p><strong>dec_cutoff</strong> (<em>float</em>) – relative frequency at which the signal will be filtered when downsampled</p></li>
-<li><p><strong>filter_type</strong> (<em>str</em>) – ‘lp’ or ‘hp’</p></li>
+<li><p><strong>filter_type</strong> (<em>str</em>) – <p>Which side of <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> is returned:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">'lp'</span></code> returns the low-frequency content <strong>below</strong> <code class="docutils literal notranslate"><span class="pre">cutoff</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">'hp'</span></code> returns <code class="docutils literal notranslate"><span class="pre">x</span></code> minus that low-frequency content, i.e. the
+high-frequency content <strong>above</strong> <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> (use this to remove slow drift).</p></li>
+</ul>
+<p>Pick the one that matches the content you want to keep – see the examples.</p>
+</p></li>
 <li><p><strong>ftype</strong> (<em>str</em>) – ‘fir’ or ‘iir’</p></li>
 </ul>
 </dd>
 </dl>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">LFFilter</span> <span class="o">=</span> <span class="n">LowFrequencyFilter</span><span class="p">(</span><span class="n">fs</span><span class="o">=</span><span class="n">fs</span><span class="p">,</span> <span class="n">cutoff</span><span class="o">=</span><span class="n">cutoff_low</span><span class="p">,</span> <span class="n">n_decimate</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">n_order</span><span class="o">=</span><span class="mi">101</span><span class="p">,</span> <span class="n">dec_cutoff</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span> <span class="n">filter_type</span><span class="o">=</span><span class="s1">&#39;lp&#39;</span><span class="p">)</span>
-<span class="n">X_inp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mf">1e4</span><span class="p">)</span>
-<span class="n">X_outp</span> <span class="o">=</span> <span class="n">LFilter</span><span class="p">(</span><span class="n">X_inp</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">10000</span><span class="p">)</span>
+
+<span class="c1"># keep slow content below the cutoff (e.g. isolate drift / a slow oscillation)</span>
+<span class="n">lowpass</span> <span class="o">=</span> <span class="n">LowFrequencyFilter</span><span class="p">(</span><span class="n">fs</span><span class="o">=</span><span class="n">fs</span><span class="p">,</span> <span class="n">cutoff</span><span class="o">=</span><span class="n">cutoff</span><span class="p">,</span> <span class="n">n_decimate</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">n_order</span><span class="o">=</span><span class="mi">101</span><span class="p">,</span> <span class="n">filter_type</span><span class="o">=</span><span class="s1">&#39;lp&#39;</span><span class="p">)</span>
+<span class="n">x_slow</span> <span class="o">=</span> <span class="n">lowpass</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+<span class="c1"># remove slow drift, keeping content above the cutoff</span>
+<span class="n">highpass</span> <span class="o">=</span> <span class="n">LowFrequencyFilter</span><span class="p">(</span><span class="n">fs</span><span class="o">=</span><span class="n">fs</span><span class="p">,</span> <span class="n">cutoff</span><span class="o">=</span><span class="n">cutoff</span><span class="p">,</span> <span class="n">n_decimate</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">n_order</span><span class="o">=</span><span class="mi">101</span><span class="p">,</span> <span class="n">filter_type</span><span class="o">=</span><span class="s1">&#39;hp&#39;</span><span class="p">)</span>
+<span class="n">x_detrended</span> <span class="o">=</span> <span class="n">highpass</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
 </pre></div>
 </div>
 <dl class="py method">
@@ -589,17 +602,22 @@ of the signal that do not form a complete window are ignored.</p>
 <dt class="sig sig-object py" id="brainmaze_utils.signal.fft_filter">
 <span class="sig-prename descclassname"><span class="pre">brainmaze_utils.signal.</span></span><span class="sig-name descname"><span class="pre">fft_filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutoff</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'lp'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.signal.fft_filter" title="Link to this definition">#</a></dt>
 <dd><p>FFT filter</p>
+<p>Filters along the last axis, so a 2-D array of shape <code class="docutils literal notranslate"><span class="pre">(n_signals,</span> <span class="pre">n_samples)</span></code> is
+filtered per-signal.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>X</strong> (<em>numpy.ndarray</em>)</p></li>
+<li><p><strong>X</strong> (<em>numpy.ndarray</em>) – Signal <code class="docutils literal notranslate"><span class="pre">(n_samples,)</span></code> or a stack of signals <code class="docutils literal notranslate"><span class="pre">(...,</span> <span class="pre">n_samples)</span></code>.</p></li>
 <li><p><strong>fs</strong> (<em>float</em>)</p></li>
 <li><p><strong>cutoff</strong> (<em>float</em>)</p></li>
 <li><p><strong>type</strong> (<em>str</em>) – ‘lp’ or ‘hp’</p></li>
 </ul>
 </dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p>numpy.ndarray</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Same shape as <code class="docutils literal notranslate"><span class="pre">X</span></code>.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
 </dd>
 </dl>
 </dd></dl>
