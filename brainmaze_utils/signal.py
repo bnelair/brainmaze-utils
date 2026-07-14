@@ -245,9 +245,13 @@ def fft_filter(X:np.ndarray, fs:float, cutoff:float, type:str='lp'):
     """
     FFT filter
 
+    Filters along the last axis, so a 2-D array of shape ``(n_signals, n_samples)`` is
+    filtered per-signal.
+
     Parameters
     ----------
     X : numpy.ndarray
+        Signal ``(n_samples,)`` or a stack of signals ``(..., n_samples)``.
     fs : float
     cutoff : float
     type : str
@@ -256,21 +260,33 @@ def fft_filter(X:np.ndarray, fs:float, cutoff:float, type:str='lp'):
     Returns
     -------
     numpy.ndarray
+        Same shape as ``X``.
 
     """
+    if type not in ('lp', 'hp'):
+        raise ValueError(f"type must be 'lp' or 'hp', got {type!r}")
+    if fs <= 0:
+        raise ValueError(f"fs must be > 0, got {fs!r}")
+    if cutoff < 0:
+        raise ValueError(f"cutoff must be >= 0, got {cutoff!r}")
 
-    Xs = fft.fft(X)
-    freq = np.linspace(0, fs, Xs.shape[0])
-    pos = np.where(freq > cutoff)[0][0]
+    n_samples = X.shape[-1]
+    Xs = fft.fft(X, axis=-1)
+    freq = np.linspace(0, fs, n_samples)
+    above = np.where(freq > cutoff)[0]
+    if above.size == 0:  # cutoff at or above the top bin -> nothing above it to remove
+        stop = pos = n_samples
+    else:
+        pos = int(above[0])
+        stop = n_samples - pos  # symmetric upper bound == original [pos:-pos]
 
     if type == 'lp':
-        X_new = Xs
-        X_new[pos:-pos] = 0
-    elif type == 'hp':
+        X_new = Xs.copy()
+        X_new[..., pos:stop] = 0
+    else:  # 'hp'
         X_new = np.zeros_like(Xs)
-        X_new[pos:-pos] = Xs[pos:-pos]
-    X = np.real(fft.ifft(X_new))
-    return X
+        X_new[..., pos:stop] = Xs[..., pos:stop]
+    return np.real(fft.ifft(X_new, axis=-1))
 
 def buffer(x:np.ndarray, fs:float=1, segm_size:float=None, overlap:float = 0, drop:bool=True):
     """
@@ -390,16 +406,28 @@ class LowFrequencyFilter:
         dec_cutoff : float
             relative frequency at which the signal will be filtered when downsampled
         filter_type : str
-            'lp' or 'hp'
+            Which side of ``cutoff`` is returned:
+
+            - ``'lp'`` returns the low-frequency content **below** ``cutoff``.
+            - ``'hp'`` returns ``x`` minus that low-frequency content, i.e. the
+              high-frequency content **above** ``cutoff`` (use this to remove slow drift).
+
+            Pick the one that matches the content you want to keep -- see the examples.
         ftype : str
             'fir' or 'iir'
 
 
         .. code-block:: python
 
-            LFFilter = LowFrequencyFilter(fs=fs, cutoff=cutoff_low, n_decimate=2, n_order=101, dec_cutoff=0.3, filter_type='lp')
-            X_inp = np.random.randn(1e4)
-            X_outp = LFilter(X_inp)
+            x = np.random.randn(10000)
+
+            # keep slow content below the cutoff (e.g. isolate drift / a slow oscillation)
+            lowpass = LowFrequencyFilter(fs=fs, cutoff=cutoff, n_decimate=2, n_order=101, filter_type='lp')
+            x_slow = lowpass(x)
+
+            # remove slow drift, keeping content above the cutoff
+            highpass = LowFrequencyFilter(fs=fs, cutoff=cutoff, n_decimate=2, n_order=101, filter_type='hp')
+            x_detrended = highpass(x)
     """
 
     __version__ = '0.0.2'

@@ -163,3 +163,67 @@ def test_signal_not_multiple_of_window_size():
     np.testing.assert_array_equal(downsampled_signal, expected_downsampled_signal)
     assert len(downsampled_signal) == expected_output_length
     assert actual_fs == pytest.approx(expected_actual_fs)
+
+
+# --------------------------------------------------------------------------------------
+# fft_filter
+# --------------------------------------------------------------------------------------
+from brainmaze_utils.signal import fft_filter
+
+_FS = 200.0
+_T = np.arange(0, 10, 1 / _FS)
+_LOW = np.sin(2 * np.pi * 2 * _T)     # 2 Hz  -> passes a 4 Hz lowpass
+_HIGH = np.sin(2 * np.pi * 30 * _T)   # 30 Hz -> removed by a 4 Hz lowpass
+
+
+@pytest.mark.parametrize('kind', ['lp', 'hp'])
+def test_fft_filter_isolates_the_right_band_1d(kind):
+    out = fft_filter(_LOW + _HIGH, _FS, 4, kind)
+    keep, drop = (_LOW, _HIGH) if kind == 'lp' else (_HIGH, _LOW)
+    # the kept component survives; the rejected one is gone
+    assert np.corrcoef(out, keep)[0, 1] > 0.99
+    assert np.abs(fft_filter(drop, _FS, 4, kind)).max() < 1e-6
+
+
+@pytest.mark.parametrize('kind', ['lp', 'hp'])
+def test_fft_filter_2d_is_per_channel(kind):
+    X = np.vstack([_LOW, _HIGH])
+    out = fft_filter(X, _FS, 4, kind)
+    expected = np.vstack([fft_filter(_LOW, _FS, 4, kind),
+                          fft_filter(_HIGH, _FS, 4, kind)])
+    assert out.shape == X.shape
+    np.testing.assert_allclose(out, expected, atol=1e-12)
+
+
+def test_fft_filter_2d_lowpass_removes_out_of_band_channel():
+    # regression: a 30 Hz channel must be annihilated by a 4 Hz lowpass, not passed through
+    X = np.vstack([_LOW, _HIGH])
+    out = fft_filter(X, _FS, 4, 'lp')
+    assert np.abs(out[0]).max() > 0.9    # 2 Hz kept
+    assert np.abs(out[1]).max() < 1e-6   # 30 Hz removed
+
+
+def test_fft_filter_nd_matches_per_signal():
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(2, 3, _T.size))
+    out = fft_filter(X, _FS, 4, 'hp')
+    expected = np.stack([[fft_filter(X[i, j], _FS, 4, 'hp') for j in range(3)]
+                         for i in range(2)])
+    np.testing.assert_allclose(out, expected, atol=1e-12)
+
+
+def test_fft_filter_cutoff_at_or_above_nyquist_does_not_raise():
+    np.testing.assert_allclose(fft_filter(_LOW, _FS, 150, 'lp'), _LOW, atol=1e-9)
+    np.testing.assert_allclose(fft_filter(_LOW, _FS, 150, 'hp'), 0.0, atol=1e-9)
+
+
+def test_fft_filter_rejects_unknown_type():
+    with pytest.raises(ValueError):
+        fft_filter(_LOW, _FS, 4, 'bandpass')
+
+
+def test_fft_filter_does_not_mutate_input():
+    x = (_LOW + _HIGH).copy()
+    before = x.copy()
+    fft_filter(x, _FS, 4, 'lp')
+    np.testing.assert_array_equal(x, before)
