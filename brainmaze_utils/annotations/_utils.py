@@ -317,7 +317,13 @@ def filter_by_duration(dfAnnotations: pd.DataFrame, duration: Union[int, float])
 
 def filter_by_key(dfAnnotations: pd.DataFrame, key: str, value: Union[int, float]):
     """
-    Keeps only annotations given by the key and value within the pandas DataFrame
+    Removes annotations whose ``key`` column equals ``value``, keeping all others.
+
+    Note
+    ----
+    This *drops* the rows matching ``value`` (the inverse of what the name may suggest);
+    e.g. ``filter_by_key(df, 'annotation', 'Arrousal')`` returns the frame with arousals
+    removed.
     """
     return dfAnnotations.loc[dfAnnotations[key] != value].reset_index(drop=True)
 
