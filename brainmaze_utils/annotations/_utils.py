@@ -315,7 +315,7 @@ def filter_by_duration(dfAnnotations: pd.DataFrame, duration: Union[int, float])
     dfAnnotations = dfAnnotations.loc[dfAnnotations['duration'] == duration].reset_index(drop=True)
     return dfAnnotations
 
-def filter_by_key(dfAnnotations: pd.DataFrame, key: str, value: Union[int, float]):
+def filter_by_key(dfAnnotations: pd.DataFrame, key: str, value: Union[int, float, str]):
     """
     Removes annotations whose ``key`` column equals ``value``, keeping all others.
 
