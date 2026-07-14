@@ -265,6 +265,10 @@ def fft_filter(X:np.ndarray, fs:float, cutoff:float, type:str='lp'):
     """
     if type not in ('lp', 'hp'):
         raise ValueError(f"type must be 'lp' or 'hp', got {type!r}")
+    if fs <= 0:
+        raise ValueError(f"fs must be > 0, got {fs!r}")
+    if cutoff < 0:
+        raise ValueError(f"cutoff must be >= 0, got {cutoff!r}")
 
     n_samples = X.shape[-1]
     Xs = fft.fft(X, axis=-1)
