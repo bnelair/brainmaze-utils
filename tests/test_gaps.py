@@ -307,7 +307,8 @@ def test_short_gaps_keep_delta_band():                         # 1 s minimum Wel
     r = []
     for a in st:
         s, e = int(a * fs), int(a * fs) + int(0.2 * fs)
-        nb = np.r_[np.arange(s - int(10 * fs), s - int(fs)), np.arange(e + int(fs), e + int(10 * fs))]
+        nb = np.r_[np.arange(s - int(10 * fs), s - int(fs)),
+                   np.arange(e + int(fs), e + int(10 * fs))]
         r.append(np.sqrt(np.mean(f[s + 12:e - 12] ** 2) / np.mean(f[nb] ** 2)))
     assert np.median(r) > 0.47                              # 0.57 (0.36 without)
 
@@ -330,8 +331,9 @@ def test_bursts_in_context_are_not_rejected_as_artifacts():    # V3
         fy, fo = _band(y, fs, 11, 15), _band(x0, fs, 11, 15)
         num += np.mean(fy[a + 125:e - 125] ** 2)
         den += np.mean(np.r_[fo[a - 5000:a], fo[e:e + 5000]] ** 2)
-    # 0.93 with the two-band rule; 0.66 with "any band > 3 MAD" (v3_rules.py)
-    assert np.sqrt(num / den) > 0.85
+    # 1.02 with the two-band rule; 0.94 with ">= 2 bands > 1 MAD", ~0.7 with "any band >
+    # 3 MAD" (the round-2 rule; scratch/utils-gaps/r3/v3_rules.py, mutate_r3.py)
+    assert np.sqrt(num / den) > 0.96
 
 
 def test_interpolated_short_gaps_do_not_bias_context():        # V5
@@ -545,10 +547,13 @@ def test_mask_in_gaps_points_with_margin_seconds_and_samples():
     gaps = np.array([[500, 750]])                           # 2.0 - 3.0 s at 250 Hz
     t = np.array([1.85, 1.95, 2.5, 2.99, 3.05, 3.15])
     expect = [False, True, True, True, True, False]
-    assert mask_in_gaps(t, gaps / FS, FS, units='seconds', gap_units='seconds', margin_s=0.1).tolist() == expect
-    assert mask_in_gaps(np.round(t * FS).astype(int), gaps, FS, units='samples', gap_units='samples',
+    assert mask_in_gaps(t, gaps / FS, FS, units='seconds', gap_units='seconds',
                         margin_s=0.1).tolist() == expect
-    assert mask_in_gaps(t, gaps / FS, FS, units='seconds', gap_units='seconds', margin_s=0.0).tolist() == [
+    assert mask_in_gaps(np.round(t * FS).astype(int), gaps, FS, units='samples',
+                        gap_units='samples',
+                        margin_s=0.1).tolist() == expect
+    assert mask_in_gaps(t, gaps / FS, FS, units='seconds', gap_units='seconds',
+                        margin_s=0.0).tolist() == [
         False, False, True, True, False, False]
 
 
@@ -618,7 +623,8 @@ def test_mask_in_gaps_intervals_overlap():
     gaps_s = np.array([[2.0, 3.0], [10.0, 10.5]])
     start = np.array([1.0, 1.5, 9.0, 11.0])
     end = np.array([1.5, 2.2, 12.0, 11.5])
-    assert mask_in_gaps(start, gaps_s, FS, units='seconds', gap_units='seconds', margin_s=0, end=end).tolist() == [
+    assert mask_in_gaps(start, gaps_s, FS, units='seconds', gap_units='seconds', margin_s=0,
+                        end=end).tolist() == [
         False, True, True, False]
 
 
@@ -627,8 +633,10 @@ def test_mask_handles_unsorted_and_nested_gaps_and_empty():
     assert mask_in_gaps([15.0, 5.0, 1.5], gaps_s, FS, units='seconds', gap_units='seconds',
                         margin_s=0).tolist() == [True, False, True]
     assert mask_in_gaps([], gaps_s, FS, units='seconds', gap_units='seconds').size == 0
-    assert mask_in_gaps([1.0], np.zeros((0, 2)), FS, units='seconds', gap_units='seconds').tolist() == [False]
-    assert mask_in_gaps([1], find_gaps(np.arange(5.0)), FS, units='samples', gap_units='samples').tolist() == [False]
+    assert mask_in_gaps([1.0], np.zeros((0, 2)), FS, units='seconds',
+                        gap_units='seconds').tolist() == [False]
+    assert mask_in_gaps([1], find_gaps(np.arange(5.0)), FS, units='samples',
+                        gap_units='samples').tolist() == [False]
 
 
 def test_mask_validation():                                    # R9
@@ -654,7 +662,8 @@ def test_drop_in_gaps_points_and_intervals():
     det = np.array([250, 1100, 1490, 1550], dtype=np.int64)
     out = drop_in_gaps(det, gaps, FS, units='samples', gap_units='samples')
     assert out.tolist() == [250, 1550] and out.dtype == np.int64
-    s, e = drop_in_gaps([0.5, 1.5], np.array([[1.0, 2.0]]), 100, units='seconds', gap_units='seconds',
+    s, e = drop_in_gaps([0.5, 1.5], np.array([[1.0, 2.0]]), 100, units='seconds',
+                        gap_units='seconds',
                         end=[0.6, 1.6])
     assert s.tolist() == [0.5] and e.tolist() == [0.6]
 

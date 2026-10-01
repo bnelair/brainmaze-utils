@@ -644,8 +644,10 @@ def _fill_long(y, ok, s, e, nxt, fs, p, root):
     method = p['method']
     if method == 'spectral':
         nps = _nperseg(n, fs, p['ctx'])
-        # context: ~16 gap lengths (rounded up to 2^k) per side, at least 3 Welch segments
-        L = int(min(p['ctx'], max(16 * (1 << int(np.ceil(np.log2(max(n, 2))))), 2 * nps)))
+        # context per side: ~16 gap lengths (rounded up to 2^k) but at most 7 Welch segments
+        # (4 nps) unless that is shorter than 3 segments (2 nps)
+        L = int(min(p['ctx'], max(2 * nps, min(16 * (1 << int(np.ceil(np.log2(max(n, 2))))),
+                                                4 * nps))))
     else:
         nps, L = 0, p['ctx']
     lo, hi = max(s - L, 0), min(e + L, N)
