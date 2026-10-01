@@ -170,6 +170,7 @@ import numbers
 import warnings
 
 import numpy as np
+from scipy import fft as _sfft
 from scipy import signal as _ss
 
 __all__ = ['find_gaps', 'gap_intervals', 'fill_gaps', 'pink_noise', 'mask_in_gaps',
@@ -181,6 +182,10 @@ _ALL_NAN = ('keep', 'zero', 'raise')
 _MIN_SPECTRAL_CONTEXT = 16      # valid samples needed to estimate a PSD
 _MIRROR_KINK_S = 0.01           # odd-reflection blend at the edges of the mirror fill
 _REJECT_MADS = 3.0              # context Welch segment > median + 3 MAD (log band power) = artifact
+_NPERSEG_CAP_S = 8.0            # longest Welch segment (s) for long gaps (frequency resolution)
+_COND_S = 0.02                  # observed samples per edge conditioning the fill (s; 4..64)
+_CLIP_SDS = 4.0                 # edge residuals clipped to this many robust SDs (artifacts)
+_NUGGET = 1e-6                  # relative diagonal loading of the conditioning covariance
 
 
 # ------------------------------------------------------------------ validation helpers
@@ -279,20 +284,49 @@ def pink_noise(n, beta=1.0, fmin_bins=1, rng=None):
     return (y - y.mean()) / sd if sd > 0 else np.zeros(n)
 
 
-def _nperseg(n, fs):
-    """Welch segment for a gap of n samples: next power of two >= n, within [16, ~1 s]."""
-    cap = max(16, 1 << int(np.ceil(np.log2(max(1.0 * fs, 16.0)))))
+def _nperseg(n, fs, ctx):
+    """
+    Welch segment for a gap of n samples: the next power of two >= n, at least 16, at
+    most ~8 s and at most half the context (so that each side holds >= 3 segments).
+    Long gaps thus get a fine frequency resolution (0.12-0.25 Hz) and slow rhythms are not
+    smeared into higher bands.
+    """
+    cap = min(1 << int(np.round(np.log2(max(_NPERSEG_CAP_S * fs, 16.0)))),
+              1 << int(np.floor(np.log2(max(ctx / 2.0, 16.0)))))
     return int(min(max(16, 1 << int(np.ceil(np.log2(max(n, 2))))), cap))
 
 
-def _cum_power(c, fs, nperseg):
+def _segments(ctxs, nps):
     """
-    Artifact-robust Welch PSD of ``c`` as a cumulative power function: returns (edges, cum) such
-    that ``np.interp(f, edges, cum)`` is the variance of ``c`` in (0, f] (DC excluded).
+    Half-overlapping Welch segments of the context pieces ``ctxs`` = [(values, ok), ...]
+    (``ok``: original, never-filled samples). Returns (segments, pure): only segments
+    without non-finite samples; ``pure`` marks those made only of original samples.
     """
-    nps = int(min(nperseg, c.size))
+    segs, pure = [], []
     step = max(nps // 2, 1)
-    seg = np.lib.stride_tricks.sliding_window_view(c, nps)[::step]
+    for c, ok in ctxs:
+        if c.size < nps:
+            continue
+        st = np.arange(0, c.size - nps + 1, step)
+        nf = np.r_[0, np.cumsum(~np.isfinite(c))]
+        nb = np.r_[0, np.cumsum(~ok)]
+        fin = (nf[st + nps] - nf[st]) == 0
+        st = st[fin]
+        if st.size:
+            segs.append(c[st[:, None] + np.arange(nps)])
+            pure.append((nb[st + nps] - nb[st]) == 0)
+    if not segs:
+        return np.zeros((0, nps)), np.zeros(0, dtype=bool)
+    return np.concatenate(segs), np.concatenate(pure)
+
+
+def _cum_power(seg, fs):
+    """
+    Artifact-robust Welch PSD of the segments ``seg`` (n_seg, nps) as a cumulative power
+    function: returns (edges, cum) such that ``np.interp(f, edges, cum)`` is the variance in
+    (0, f] (DC excluded).
+    """
+    nps = seg.shape[1]
     win = _ss.get_window('hann', nps)
     spec = np.fft.rfft((seg - seg.mean(axis=1, keepdims=True)) * win, axis=1)
     pw = spec.real ** 2 + spec.imag ** 2
@@ -322,29 +356,59 @@ def _cum_power(c, fs, nperseg):
     return np.r_[0.0, upper], np.r_[0.0, np.cumsum(p * width)]
 
 
-def _spectral_noise(n, fs, left, right, nperseg, rng):
-    """Gaussian noise of length n whose band powers match the context (left, right)."""
-    parts = [(c.size, _cum_power(c, fs, nperseg)) for c in (left, right)
-             if c.size >= _MIN_SPECTRAL_CONTEXT]
-    if not parts:                                       # both sides short: pool them
-        c = np.r_[left, right]
-        parts = [(c.size, _cum_power(c, fs, nperseg))]
-    k = np.arange(n // 2 + 1)
-    df = fs / n
-    lo = np.clip((k - 0.5) * df, 0.0, fs / 2.0)
-    hi = np.clip((k + 0.5) * df, 0.0, fs / 2.0)
-    wsum = float(sum(w for w, _ in parts))
-    power = np.zeros(k.size)                            # variance of the fill in bin k
-    for w, (edges, cum) in parts:
-        power += (w / wsum) * (np.interp(hi, edges, cum) - np.interp(lo, edges, cum))
+def _context_psd(ctxs, nps, fs):
+    """
+    (edges, cum) of the context, or None if there are fewer than ``_MIN_SPECTRAL_CONTEXT``
+    valid samples. Prefers Welch segments made only of original samples (interpolated short
+    gaps and earlier fills have no high-frequency power and would bias the estimate low);
+    falls back to segments containing filled samples, then to shorter segments, then to the
+    concatenated valid samples.
+    """
+    while True:
+        seg, pure = _segments(ctxs, nps)
+        if pure.sum() >= 3:
+            return _cum_power(seg[pure], fs)
+        if seg.shape[0] >= 3 or (seg.shape[0] and nps <= 16):
+            return _cum_power(seg, fs)
+        if nps <= 16:
+            break
+        nps //= 2
+    c = np.concatenate([v[ok] for v, ok in ctxs])
+    if c.size < _MIN_SPECTRAL_CONTEXT:
+        return None
+    nps = int(min(nps, c.size))
+    step = max(nps // 2, 1)
+    st = np.arange(0, c.size - nps + 1, step)
+    return _cum_power(c[st[:, None] + np.arange(nps)], fs)
+
+
+def _bin_power(m, fs, cum_fn):
+    """Variance per rfft bin of a length-m synthesis, from a cumulative power function."""
+    df = fs / m
+    edges = np.clip((np.arange(m // 2 + 2) - 0.5) * df, 0.0, fs / 2.0)
+    power = np.diff(cum_fn(edges))
     power[0] = 0.0
-    # a length-n irfft gets variance 2|X_k|^2/n^2 from bin k (|X_k|^2/n^2 at Nyquist)
-    X = (rng.standard_normal(k.size) + 1j * rng.standard_normal(k.size)) \
-        * (np.sqrt(power) * (n / 2.0))
-    if n % 2 == 0:
-        X[-1] = rng.standard_normal() * np.sqrt(power[-1]) * n
+    return power
+
+
+def _synthesize(power, m, rng):
+    """Gaussian noise of length m with variance ``power[k]`` from rfft bin k."""
+    # a length-m irfft gets variance 2|X_k|^2/m^2 from bin k (|X_k|^2/m^2 at Nyquist)
+    nb = power.size
+    X = rng.standard_normal(nb) + 1j * rng.standard_normal(nb)
+    X *= np.sqrt(power) * (m / 2.0)
+    if m % 2 == 0:
+        X[-1] = rng.standard_normal() * np.sqrt(power[-1]) * m
     X[0] = 0.0
-    return np.fft.irfft(X, n)
+    return np.fft.irfft(X, m)
+
+
+def _autocov(power, m, nlag):
+    """Autocovariance (lags 0..nlag-1) of the circular process synthesised from ``power``."""
+    Y = power.copy()
+    if m % 2 == 0:
+        Y[-1] *= 2.0
+    return (np.fft.irfft(Y, m) * (m / 2.0))[:nlag]
 
 
 def _robust_sd(v):
@@ -367,14 +431,25 @@ def _root_seed(seed):
     return np.random.SeedSequence(seed)
 
 
-def _gap_rng(root, s, e, *context):
-    """Independent stream per gap from (seed, gap position, hash of the context data)."""
+def _gap_rng(root, n, *context):
+    """
+    Independent stream per gap from (seed, gap length, hash of the QUANTISED context data).
+    The context is quantised to 1/1000 of its robust SD around its median, so ulp-level
+    differences (numpy/scipy versions, platforms) and the units (uV vs V) do not change the
+    fill; the gap position is not used, so the same data at another array offset (e.g.
+    segment-wise processing) gives the same fill.
+    """
     h = hashlib.blake2b(digest_size=8)
     for c in context:               # every k-th sample (<= ~4096 per side) keeps it cheap
-        h.update(np.ascontiguousarray(c[::max(1, c.size // 4096)], dtype='<f8').tobytes())
+        v = np.asarray(c[::max(1, c.size // 4096)], dtype=np.float64)
+        h.update(np.int64(v.size).tobytes())
+        if v.size:
+            sd = _robust_sd(v)
+            q = (v - np.median(v)) / (sd if sd > 0 else 1.0)
+            h.update(np.round(q * 1000.0).astype('<i8').tobytes())
     key = int.from_bytes(h.digest(), 'little')
     ss = np.random.SeedSequence(entropy=root.entropy,
-                                spawn_key=tuple(root.spawn_key) + (int(s), int(e), key))
+                                spawn_key=tuple(root.spawn_key) + (int(n), key))
     return np.random.default_rng(ss)
 
 
@@ -457,38 +532,121 @@ def _mirror_core(y, s, e, nxt, ctx, lvl_a, lvl_b, base):
     return base + (w * left_img + (1 - w) * right_img) / g
 
 
-def _fill_long(y, known, s, e, nxt, fs, p, root):
+def _conditioned_noise(power, R_fn, n, y_left, y_right, base_ext, clip, W, rng):
+    """
+    Noise of length n (variance ``power`` per bin) conditioned on the observed residuals
+    next to the gap (kriging / conditional simulation of the Gaussian process with that
+    spectrum): returns the fill minus the level bridge.
+
+    ``y_left``/``y_right``: the last/first observed samples on each side (may be empty);
+    ``base_ext(t)``: the level bridge at relative positions t (t < 0 left, t >= n right);
+    residuals are clipped to +-``clip`` so a spike or artifact at the edge is not continued
+    into the gap; the conditioning is evaluated within ``W`` samples of each edge (the whole
+    gap if it is shorter than 2W) and faded out over the second half of W.
+    """
+    pl, pr = y_left.size, y_right.size
+    pad = power.pad
+    m = power.m
+    z = _synthesize(power.p, m, rng)
+    if W <= 0 or pl + pr == 0 or power.r0 <= 0:
+        return z[pl:pl + n]
+    obs_t = np.r_[np.arange(-pl, 0), np.arange(n, n + pr)]          # relative to gap start
+    d = np.r_[y_left, y_right] - base_ext(obs_t)
+    d = np.clip(d, -clip, clip) if clip > 0 else d
+    R = R_fn(n + pl + pr)
+    C = R[np.abs(obs_t[:, None] - obs_t[None, :])]
+    C[np.diag_indices_from(C)] += _NUGGET * power.r0
+    zo = np.r_[z[:pl], z[pl + n:pl + n + pr]]
+    try:
+        a = np.linalg.solve(C, d - zo)
+    except np.linalg.LinAlgError:
+        a = np.linalg.lstsq(C, d - zo, rcond=None)[0]
+    out = z[pl:pl + n].copy()
+    full = (n <= 2 * W) if (pl and pr) else (n <= W)
+    if full:
+        t = np.arange(n)
+        out += R[np.abs(t[:, None] - obs_t[None, :])] @ a
+        return out
+    h = W // 2
+    fade = np.r_[np.ones(h), 0.5 * (1.0 + np.cos(np.pi * np.arange(1, W - h + 1) / (W - h + 1.0)))]
+    if pl:
+        t = np.arange(W)
+        out[:W] += fade * (R[np.abs(t[:, None] - obs_t[None, :])] @ a)
+    if pr:
+        t = np.arange(n - W, n)
+        out[n - W:] += fade[::-1] * (R[np.abs(t[:, None] - obs_t[None, :])] @ a)
+    return out
+
+
+class _Power:
+    """Per-bin variance of a length-m synthesis (m = gap + observations + pad)."""
+
+    def __init__(self, p, m, pad):
+        self.p, self.m, self.pad = p, m, pad
+        self.r0 = float(p.sum())
+
+
+def _fill_long(y, ok, s, e, nxt, fs, p, root):
     n = e - s
     N = y.size
     method = p['method']
     if method == 'spectral':
-        nps = _nperseg(n, fs)
+        nps = _nperseg(n, fs, p['ctx'])
         L = int(min(p['ctx'], 16 * nps))
     else:
         nps, L = 0, p['ctx']
     lo, hi = max(s - L, 0), min(e + L, N)
-    left = y[lo:s][known[lo:s]].astype(np.float64)
-    right = y[e:hi][known[e:hi]].astype(np.float64)
+    ctx_l, ok_l = y[lo:s], ok[lo:s]
+    ctx_r, ok_r = y[e:hi], ok[e:hi]
+    left, right = ctx_l[ok_l].astype(np.float64), ctx_r[ok_r].astype(np.float64)
+    if left.size + right.size == 0:          # only filled samples nearby (dense long gaps)
+        ok_l, ok_r = np.isfinite(ctx_l), np.isfinite(ctx_r)
+        left, right = ctx_l[ok_l].astype(np.float64), ctx_r[ok_r].astype(np.float64)
     near = max(min(int(round(0.5 * fs)), L), 1)
     lvl_a = float(np.median(left[-near:])) if left.size else float(np.median(right[:near]))
     lvl_b = float(np.median(right[:near])) if right.size else lvl_a
-    base = lvl_a + (lvl_b - lvl_a) * (np.arange(1, n + 1) / (n + 1.0))
+
+    def base_ext(t):
+        return lvl_a + (lvl_b - lvl_a) * ((np.asarray(t) + 1.0) / (n + 1.0))
+
+    base = base_ext(np.arange(n))
     two_sided = s > 0 and e < N
     t_cap = n // 2 if two_sided else n
 
     if method == 'mirror':
         fill = _mirror_core(y, s, e, nxt, p['ctx'], lvl_a, lvl_b, base)
         tk = min(max(int(round(_MIRROR_KINK_S * fs)), 2), t_cap)
-        fill = _blend_edges(y, s, e, nxt, fill, base, tk, power_complementary=False)
-    else:
-        rng = _gap_rng(root, s, e, left, right)
-        if method == 'spectral' and left.size + right.size >= _MIN_SPECTRAL_CONTEXT:
-            noise = _spectral_noise(n, fs, left, right, nps, rng)
-        else:
-            noise = _robust_sd(np.r_[left, right]) * pink_noise(n, beta=p['beta'], rng=rng)
-        fill = _blend_edges(y, s, e, nxt, base + noise, base, min(p['taper'], t_cap),
-                            power_complementary=True)
-    y[s:e] = fill
+        y[s:e] = _blend_edges(y, s, e, nxt, fill, base, tk, power_complementary=False)
+        return
+
+    rng = _gap_rng(root, n, left, right)
+    # observations conditioning the edges: a few samples (~20 ms, 4..64) on each side
+    q = int(min(max(round(_COND_S * fs), 4), 64))
+    y_left = y[max(s - q, 0):s].astype(np.float64)
+    y_right = y[e:min(e + q, nxt)].astype(np.float64)
+    pad = max(nps, 2 * q, 16)
+    m = int(_sfft.next_fast_len(n + y_left.size + y_right.size + pad, real=True))
+    cum = None
+    if method == 'spectral':
+        cum = _context_psd([(ctx_l, ok_l), (ctx_r, ok_r)], nps, fs)
+    if cum is not None:
+        edges, cumv = cum
+        power = _bin_power(m, fs, lambda f: np.interp(f, edges, cumv))
+    else:                                   # 'pink', or 'spectral' with too little context
+        k = np.arange(m // 2 + 1, dtype=float)
+        power = np.zeros(k.size)
+        keep = k >= m / float(n)            # lowest frequency 1 / gap, as pink_noise
+        power[keep] = k[keep] ** (-p['beta'])
+        tot = power.sum()
+        sd = _robust_sd(np.r_[left, right])
+        power = power * (sd ** 2 / tot) if tot > 0 else power
+    pw = _Power(power, m, pad)
+    clip = _CLIP_SDS * _robust_sd(np.r_[left[-near:], right[:near]] - np.r_[
+        np.full(min(near, left.size), lvl_a), np.full(min(near, right.size), lvl_b)])
+    noise = _conditioned_noise(pw, lambda nl: _autocov(power, m, nl), n, y_left, y_right,
+                               base_ext, clip, min(p['taper'], t_cap) if two_sided else
+                               min(p['taper'], n), rng)
+    y[s:e] = base + noise
 
 
 def _fill_row(y, bad, fs, p, root):
@@ -502,13 +660,13 @@ def _fill_row(y, bad, fs, p, root):
     long_gaps = gaps[is_long]
     if long_gaps.shape[0] == 0:
         return
-    known = np.isfinite(y)          # original data + interpolated short gaps
+    ok = ~bad                       # ORIGINAL samples only (not the interpolated short gaps)
     nxt = np.r_[long_gaps[1:, 0], y.size]
     for (s, e), nx in zip(long_gaps, nxt):
-        _fill_long(y, known, int(s), int(e), int(nx), fs, p, root)
+        _fill_long(y, ok, int(s), int(e), int(nx), fs, p, root)
 
 
-def fill_gaps(x, fs, *, max_interp_s=0.1, method='spectral', context_s=10.0, taper_s=0.5,
+def fill_gaps(x, fs, *, max_interp_s=0.1, method='spectral', context_s=30.0, taper_s=0.5,
               beta=1.0, seed=0, axis=-1, all_nan='keep', copy=True):
     """
     Fill NaN/inf gaps so a detector can run on the signal (see the module docstring for
