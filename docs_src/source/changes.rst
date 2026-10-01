@@ -88,7 +88,10 @@ Signal (:mod:`brainmaze_utils.signal`)
     Butterworth is still applied when it lies below ``0.45 * fs`` (ratios below ~1.35, e.g.
     150->200 Hz, as in v2.0.0) and skipped otherwise; the interpolator keeps content up to
     ``0.45 * fs``. Accuracy 150->200 Hz: 4e-7 (v2.0.0: 7e-5). When upsampling, the last output
-    sample can lie up to one input period after the last input sample; it is extrapolated.
+    sample can lie up to one input period after the last input sample (up to 3 output samples,
+    e.g. 250->1000 Hz); these are extrapolated and their error on a unit tone is 0.1 (20 Hz) to ~1
+    (near ``0.4 * fs``). When the Butterworth is skipped, content between ``0.45 * fs`` and
+    ``fs / 2`` leaves an image (~7 % at ``0.48 * fs``).
   - A user ``cutoff >= fs_new / 2`` raises when downsampling. v2.0.0 accepted it and let content
     above the new Nyquist frequency alias (70 Hz passed at full amplitude for 1000->100 Hz with
     ``cutoff=80``).
@@ -132,6 +135,11 @@ Signal (:mod:`brainmaze_utils.signal`)
     split the signal and every segment is filtered with the record-edge handling above, so there
     is no jump at gap edges. The ``decimate -> LowFrequencyFilter`` cascade therefore works on
     gappy recordings.
+    Limits: a level jump across a *bridged* gap is filtered like a real step (500 uV step, 0.1 s
+    gap, 0.5 Hz high-pass: >10 uV for about +-1.5 s); lower ``max_gap_fill`` to split instead.
+    Segments of a few samples between long gaps give finite but meaningless values. The default
+    ``0.5 / cutoff`` is slightly above the measured bridge-versus-split crossover (~0.9 s at 0.5 Hz,
+    i.e. ~0.45 / cutoff; the difference near the crossover is small), and is kept.
   - IIR filters use second-order sections (numerically identical response). N-D input is
     supported (time on the last axis).
   - New ``UserWarning`` for FIRs too short to resolve the cutoff (see the table). The docstring
@@ -147,6 +155,9 @@ Signal (:mod:`brainmaze_utils.signal`)
   - **NaN gaps are handled** like in ``LowFrequencyFilter`` (v2.0.0: all-NaN output).
   - New ``edges`` parameter: ``'periodic'`` (v2.0.0 behaviour, the default for NaN-free input) or
     ``'extend'`` (the ``LowFrequencyFilter`` edge handling, the default when the input has NaN).
+    **Caution:** with the default ``edges=None`` one NaN anywhere switches the whole output from
+    ``'periodic'`` to ``'extend'`` (differences up to ~1 for SD-172 1/f data far from the gap);
+    pass ``edges`` explicitly when the result must not depend on the presence of gaps.
     For a 1 Hz high-pass on a 60 s cut of 1/f data, ``'extend'`` reduces the edge error from
     ~80-100 to ~6-14.
 - ``buffer``: ``overlap >= segm_size`` used to hang in an infinite loop; it now raises.
@@ -214,6 +225,8 @@ Annotations (:mod:`brainmaze_utils.annotations`)
     (``N2``); a save/load round trip returns the original labels. New ``strip_suffixes=False``
     returns the stored names, e.g. to tell a scorer's ``N2`` from a model's ``N2_best`` in one
     file (both load as ``N2`` by default). The annotation group is still named ``Import_best``.
+    Compatibility: the v2.0.0 loader strips only ``_aisc``/``_PiesPro``, so it reads files written
+    by this version as ``N2_bm``, ``IED_bm`` etc.; upgrade readers when mixing versions.
   - Annotation types that share a name are no longer dropped (they used to load as
     ``error_unknown``).
   - 7-digit (.NET) fractional seconds are parsed (truncated to microseconds).

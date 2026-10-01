@@ -280,7 +280,15 @@ def decimate(x, fs, fs_new, cutoff=None, datarate=False):
       ``fs_new / fs < 1.35`` (where ``fs_new / 3 < 0.45 * fs``); v2.0.0 applied it up
       to 1.5, returned NaN between ~1.45 and 1.5 and raised above. The
       interpolator preserves content up to ``0.45 * fs`` (or ``1.25 * cutoff``, if
-      lower); content between ``0.45 * fs`` and ``fs / 2`` is attenuated.
+      lower); content between ``0.45 * fs`` and ``fs / 2`` is attenuated. When the
+      Butterworth is skipped (``cutoff >= 0.45 * fs``) such content is not removed but
+      leaves an image at ``fs - f``: a tone at ``0.48 * fs`` comes out with gain ~0.93
+      plus a ~7 % image.
+    - When upsampling, ``round(n * fs_new / fs)`` output samples can include up to 3
+      samples **after** the last input sample (e.g. 250->1000 Hz). They are extrapolated
+      (odd extension) and are the least reliable part of the output: on a unit-amplitude
+      tone their error is ~0.1 at 20 Hz and reaches ~1 for tones near 0.4 * fs. Discard
+      them if the end of the record matters.
     - Samples close to (but outside) a NaN gap are computed from the interpolated
       fill and the filter's impulse response, so a few output samples next to a gap
       may carry a small transient; they are not masked.
@@ -569,10 +577,18 @@ def fft_filter(X:np.ndarray, fs:float, cutoff:float, type:str='lp', edges=None, 
           ``'periodic'`` for ``cutoff == 0`` (DC removal has no edge transient).
         - ``None`` (default): ``'periodic'`` if ``X`` contains no NaN (unchanged
           from v2.0.0), ``'extend'`` if it does.
+
+        .. warning:: With ``None`` the edge handling depends on whether ``X`` contains
+           NaN: a single NaN anywhere switches the **whole** output from ``'periodic'``
+           to ``'extend'``, which changes samples far from the gap (e.g. up to ~1 for
+           SD-172 1/f data, 1 Hz high-pass, 30-60 s from the NaN). Pass ``edges``
+           explicitly (``'extend'`` is the better choice for EEG-like data) whenever
+           the result must not depend on the presence of gaps.
     max_gap_fill : float, optional
         Gaps shorter than this many seconds are bridged by linear interpolation;
         longer gaps split the signal into separately filtered segments. Default
-        ``0.5 / cutoff`` (``0`` for ``cutoff == 0``).
+        ``0.5 / cutoff`` (``0`` for ``cutoff == 0``). A level jump across a bridged gap
+        is filtered like a real step; use a smaller value to split instead.
 
     Returns
     -------
@@ -594,6 +610,9 @@ def fft_filter(X:np.ndarray, fs:float, cutoff:float, type:str='lp', edges=None, 
     ``max_gap_fill`` are bridged linearly, filtered through and re-masked; at longer
     gaps the signal is split and each segment is filtered as if it were a complete
     record, with the chosen ``edges`` handling. Leading/trailing NaN are excluded.
+    A level jump across a bridged gap is filtered as a real step, and a segment of only
+    a few samples between long gaps gives finite but meaningless values (see
+    :class:`LowFrequencyFilter`).
     (An FFT of the whole array would spread a single NaN over the entire output.)
 
     .. note:: **Changed after v2.0.0:**
@@ -957,9 +976,19 @@ class LowFrequencyFilter:
 
     - Gaps shorter than ``max_gap_fill`` (default half a cutoff period, e.g. dropped
       samples) are bridged by linear interpolation, filtered through, and re-masked.
+      The bridge does not check the two sides for a level jump: a jump across a
+      bridged gap (amplifier re-zero, reconnection after a dropout) is filtered as a
+      genuine step. E.g. a 500 uV DC step across a 0.1 s gap at 0.5 Hz high-pass gives
+      a transient above 10 uV for about +-1.5 s around the gap (the same as the response
+      to a real step). If such jumps are expected, lower ``max_gap_fill`` below the gap
+      length (``0`` always splits) so that each side is filtered on its own.
     - Longer gaps split the signal: each valid segment is filtered on its own, with
       the same edge handling as the record edges (below), so there is no jump at a
       gap edge, and nothing on one side of a long gap affects the other side.
+      A segment shorter than about ``1 / cutoff`` s (e.g. a few samples between two
+      long gaps) carries no information at the cutoff frequency: its output is finite
+      but is not a meaningful low-/high-pass estimate (a 3-sample segment can be off by
+      about 10 for SD-20 data). Treat such segments as unusable.
 
     Measured on 1/f noise (SD 20) with offset, drift and a 10 Hz tone, 0.5 Hz IIR
     high-pass, maximum error within 10 s of a gap compared with the same signal
