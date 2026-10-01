@@ -155,3 +155,107 @@ def test_nsrr_stage3_and_stage4_map_to_n3(tmp_path):
     hyp = load_NSRR(str(p))
     assert hyp['annotation'].tolist() == ['WAKE', 'N3', 'N3', 'REM']
     assert hyp['end'].tolist() == [30., 60., 120., 150.]
+
+
+def test_merge_interleaved_channels():
+    # Copilot: A:0-30, B:0-30, A:30-60, B:30-60 sorted by start interleaves the channels -> nothing merged
+    df = pd.DataFrame({'start': [0., 0., 30., 30.], 'end': [30., 30., 60., 60.],
+                       'annotation': ['N2'] * 4, 'channel': ['A', 'B', 'A', 'B']})
+    out = merge_annotations(df)
+    assert out[['start', 'end', 'channel']].values.tolist() == [[0., 60., 'A'], [0., 60., 'B']]
+    # reverse of tile, also with an overlapping second label in between
+    df = pd.DataFrame({'start': [0., 0., 30., 60.], 'end': [30., 90., 60., 90.],
+                       'annotation': ['N2', 'IED', 'N2', 'N2']})
+    out = merge_annotations(df)
+    assert out[['start', 'end', 'annotation']].values.tolist() == [[0., 90., 'N2'], [0., 90., 'IED']]
+
+
+def test_merge_missing_values_and_dtypes():
+    # Copilot: pd.NA == x is pd.NA, and all() on it raises. Missing values now form one group.
+    for col in (pd.array([pd.NA, pd.NA, 'c1', 'c1'], dtype='string'),
+                pd.array([pd.NA, pd.NA, 1, 1], dtype='Int64'),
+                pd.Series([None, np.nan, 'c1', 'c1'], dtype=object)):
+        df = pd.DataFrame({'start': [0., 30., 60., 90.], 'end': [30., 60., 90., 120.],
+                           'annotation': ['A'] * 4, 'channel': col})
+        out = merge_annotations(df)
+        assert out['start'].tolist() == [0., 60.] and out['end'].tolist() == [60., 120.]
+        assert out['channel'].isna().tolist() == [True, False]
+        assert out['channel'].dtype == df['channel'].dtype
+
+
+def test_merge_matches_v2_on_sorted_single_channel():
+    df = pd.DataFrame({'start': [0., 30., 60., 90., 150.], 'end': [30., 60., 90., 120., 180.],
+                       'annotation': ['N2', 'N2', 'N3', 'N3', 'N3'], 'duration': 30.})
+    out = merge_annotations(df)
+    assert out.values.tolist() == [[0., 60., 'N2', 60.], [60., 120., 'N3', 60.], [150., 180., 'N3', 30.]]
+
+
+def test_tile_empty_keeps_duration_column():
+    # Copilot: the empty path dropped 'duration'
+    df = pd.DataFrame({'start': pd.Series(dtype=float), 'end': pd.Series(dtype=float),
+                       'annotation': pd.Series(dtype=object), 'channel': pd.Series(dtype=object),
+                       'duration': pd.Series(dtype=float)})
+    assert list(tile_annotations(df, 30).columns) == ['start', 'end', 'annotation', 'channel', 'duration']
+    assert list(tile_annotations(df.drop(columns='duration'), 30).columns) == ['start', 'end', 'annotation', 'channel']
+
+
+# --------------------------------------------------------------------------- CyberPSG _bm suffix (maintainer decision)
+_V2_FILE = DATA / 'data' / 'cyberpsg_written_by_v2.0.0.xml'  # written by the v2.0.0 writer (labels *_best)
+_STANDARD = ['AWAKE', 'N1', 'N2', 'N3', 'REM', 'UNKNOWN', 'Arousal', 'N', 'SLP', 'IED', 'seizure', 'seizure_05', 'seizure_08']
+
+
+def _types(path):
+    from brainmaze_utils.annotations._formats.CyberPSG import CyberPSGFile
+    return {name: uid for uid, name in CyberPSGFile(str(path)).get_annotation_types().items()}
+
+
+def _frame(labels, t0=1.7e9):
+    return pd.DataFrame({'start': [t0 + 30 * i for i in range(len(labels))],
+                         'end': [t0 + 30 * i + 30 for i in range(len(labels))], 'annotation': labels})
+
+
+def test_cyberpsg_writer_bm_suffix_and_v2_uuids(tmp_path):
+    labels = _STANDARD + ['Sleep stage N2', 'MyLabel']
+    p = _save(tmp_path, _frame(labels))
+    new, old = _types(p), _types(_V2_FILE)
+    # standard labels: '<label>_bm' on disk, with exactly the UUID v2.0.0 wrote for '<label>_best'
+    for lab in _STANDARD:
+        assert new[lab + '_bm'] == old[lab + '_best'], lab
+    assert new['IED_bm'].endswith('000000000011') and new['seizure_bm'].endswith('000000000013')
+    # other labels: as given; standard_UUID entries kept
+    assert new['Sleep stage N2'] == old['Sleep stage N2']
+    assert 'MyLabel' in new and not any(k.endswith('_best') for k in new)
+
+
+def test_cyberpsg_round_trip_new_file(tmp_path):
+    labels = _STANDARD + ['Sleep stage N2', 'MyLabel']
+    out = load_CyberPSG(str(_save(tmp_path, _frame(labels))))
+    assert out['annotation'].tolist() == labels
+    raw = load_CyberPSG(str(_save(tmp_path, _frame(labels))), strip_suffixes=False)
+    assert raw['annotation'].tolist() == [l + '_bm' for l in _STANDARD] + ['Sleep stage N2', 'MyLabel']
+
+
+def test_cyberpsg_legacy_best_file_loads_to_same_labels():
+    out = load_CyberPSG(str(_V2_FILE))
+    assert out['annotation'].tolist() == _STANDARD + ['Sleep stage N2', 'MyLabel', 'IED']
+    assert out['channel'].iloc[-1] == 'LA1'
+    raw = load_CyberPSG(str(_V2_FILE), strip_suffixes=False)
+    assert raw['annotation'].iloc[0] == 'AWAKE_best'
+
+
+def test_cyberpsg_mixed_collection_same_label_set(tmp_path):
+    new = _save(tmp_path, _frame(_STANDARD + ['Sleep stage N2', 'MyLabel']))
+    dfs = load_CyberPSG([str(_V2_FILE), str(new)], verbose=False)
+    assert set(dfs[0]['annotation']) == set(dfs[1]['annotation'])
+    # re-saving a legacy file gives the same types (names *_bm, same UUIDs) as a new file
+    resaved = _types(_save(tmp_path, load_CyberPSG(str(_V2_FILE)), name='resaved.xml'))
+    assert {k: v for k, v in resaved.items() if k != 'MyLabel'} == {k: v for k, v in _types(new).items() if k != 'MyLabel'}
+
+
+def test_cyberpsg_best_and_bare_label_are_one_type(tmp_path):
+    # v2.0.0 raised KeyError (both became 'N2_best'); the PR wrote two types, order-dependent UUIDs
+    df = _frame(['N2', 'N2_best', 'N2_bm', 'IED_best'])
+    p = _save(tmp_path, df)
+    types = _types(p)
+    assert sorted(types) == ['IED_bm', 'N2_bm']
+    assert load_CyberPSG(str(p))['annotation'].tolist() == ['N2', 'N2', 'N2', 'IED']

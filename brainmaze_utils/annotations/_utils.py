@@ -178,15 +178,31 @@ def create_duration(dfHyp):
     dfHyp['duration'] = dfHyp.apply(lambda x: duration(x), axis=1)
     return dfHyp
 
+def _group_key(values):
+    """Hashable merge key; every missing value (None, NaN, NaT, pd.NA) maps to None."""
+    key = []
+    for v in values:
+        if np.ndim(v) == 0 and pd.isna(v):
+            v = None
+        try:
+            hash(v)
+        except TypeError:
+            v = repr(v)
+        key.append(v)
+    return tuple(key)
+
+
 def merge_annotations(df: pd.DataFrame):
     """
-    Merge consecutive epochs with the same annotation that touch in time
-    (``end[i-1] == start[i]``). Reverse of :func:`tile_annotations`.
+    Merge epochs with the same annotation that touch in time (``end == start`` of the
+    next one). Reverse of :func:`tile_annotations`.
 
-    The frame is first sorted by ``start`` (stable), so input order does not matter.
-    Extra columns (e.g. ``channel``) are allowed and preserved: two epochs are merged
-    only if they also have equal values in every extra column (NaN equals NaN); the
-    merged epoch keeps those values. A ``duration`` column, if present, is
+    Epochs are grouped by ``annotation`` and by the values of every extra column
+    (e.g. ``channel``; missing values - None, NaN, ``pd.NA`` - are equal to each
+    other). Within a group, epochs are sorted by ``start`` and chains of touching
+    epochs are merged; the merged epoch keeps the group's values. Epochs of other
+    groups in between (e.g. interleaved channels, or an overlapping label from a
+    second scorer) do not prevent merging. A ``duration`` column, if present, is
     recomputed.
 
     Args:
@@ -194,9 +210,18 @@ def merge_annotations(df: pd.DataFrame):
             'annotation' columns, optionally more.
 
     Returns:
-        pd.DataFrame: merged annotations, columns ``start, end, annotation``, then the
-        extra columns in their original order, then ``duration`` if it was present.
-        The input frame is not modified.
+        pd.DataFrame: merged annotations sorted by ``start`` (stable), columns
+        ``start, end, annotation``, then the extra columns in their original order
+        (dtypes kept), then ``duration`` if it was present. The input frame is not
+        modified.
+
+    Notes:
+        .. note:: **Changed after v2.0.0:**
+           v2.0.0 merged only rows that were consecutive in the input order, dropped
+           every extra column and raised on some of them. Now the frame is grouped as
+           described above, so unsorted input, interleaved channels and overlapping
+           labels merge as well; for sorted, non-overlapping single-channel input the
+           result is the same as before.
     """
 
     _validate_dataframe_annotation_columns(df)
@@ -205,32 +230,35 @@ def merge_annotations(df: pd.DataFrame):
 
     extra = _extra_columns(df)
     keep = ['start', 'end', 'annotation'] + extra
-    df_sorted = df.sort_values('start', kind='mergesort').reset_index(drop=True)
+    d = df[keep].sort_values('start', kind='mergesort').reset_index(drop=True)
 
-    def same(a, b):
-        if pd.isna(a) and pd.isna(b):
-            return True
-        return a == b
+    if len(d):
+        starts = d['start'].to_numpy()
+        ends = d['end'].to_numpy().copy()
+        groups = {}
+        for i, vals in enumerate(d[['annotation'] + extra].itertuples(index=False, name=None)):
+            groups.setdefault(_group_key(vals), []).append(i)
+        first_rows, new_ends = [], []
+        for rows in groups.values():
+            head, cur_end = rows[0], ends[rows[0]]
+            for i in rows[1:]:
+                if starts[i] == cur_end:
+                    cur_end = ends[i]
+                    continue
+                first_rows.append(head)
+                new_ends.append(cur_end)
+                head, cur_end = i, ends[i]
+            first_rows.append(head)
+            new_ends.append(cur_end)
+        order = np.argsort(np.asarray(first_rows), kind='mergesort')
+        sel = np.asarray(first_rows)[order]
+        d_out = d.iloc[sel].reset_index(drop=True)
+        d_out['end'] = np.asarray(new_ends, dtype=ends.dtype)[order]
+        d = d_out
 
-    new_df = []
-    for _, row in df_sorted[keep].iterrows():
-        row = row.to_dict()
-        if new_df:
-            last = new_df[-1]
-            if (last['annotation'] == row['annotation'] and last['end'] == row['start']
-                    and all(same(last[c], row[c]) for c in extra)):
-                last['end'] = row['end']
-                continue
-        new_df.append(row)
-
-    new_df = pd.DataFrame(new_df, columns=keep)
-    for c in ('start', 'end'):
-        if len(new_df):
-            new_df[c] = new_df[c].astype(df[c].dtype)
     if 'duration' in df.keys():
-        new_df = create_duration(new_df)
-
-    return new_df
+        d = create_duration(d)
+    return d
 
 def tile_annotations(df: pd.DataFrame, dur_threshold:Union[int, float]=30):
     """
@@ -265,7 +293,8 @@ def tile_annotations(df: pd.DataFrame, dur_threshold:Union[int, float]=30):
     extra = _extra_columns(df)
 
     if df.empty:
-        return pd.DataFrame(columns=['start', 'end', 'annotation'] + extra)
+        cols = ['start', 'end', 'annotation'] + extra + (['duration'] if 'duration' in df.keys() else [])
+        return pd.DataFrame(columns=cols)
 
     starts = df['start'].to_numpy()
     ends = df['end'].to_numpy()
@@ -322,6 +351,13 @@ def create_day_indexes(df: pd.DataFrame, hour: Union[int, float]=12, tzinfo=None
         Timezone whose wall clock defines the day boundaries. Default: the timezone of
         the data if ``start`` is timezone-aware, otherwise the machine's local
         timezone (:func:`dateutil.tz.tzlocal`).
+
+        .. warning::
+           For **UTC** data (e.g. the output of ``load_CyberPSG``) the default cuts
+           days at ``hour`` **UTC**: noon UTC is 6 or 7 AM in Chicago and 1 or 2 PM in
+           Prague, not local noon. Pass the recording site's timezone, e.g.
+           ``tzinfo=dateutil.tz.gettz('America/Chicago')``, to cut at local ``hour``.
+           (Same as v2.0.0.)
 
     Returns
     -------

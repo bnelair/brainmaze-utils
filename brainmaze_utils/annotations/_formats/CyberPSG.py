@@ -272,28 +272,66 @@ class CyberPSG_XML_Writter:
     def AnnotationTypeIDs(self):
         return [AnnotationType['id'][0].param for AnnotationType in self.AnnotationTypes.AnnotationType]
 
-    def _standard_uuid(self, name_string):
-        """Stable UUID for standard labels: exact name, else ``name + '_best'``."""
-        if name_string in self.standard_UUID:
-            return self.standard_UUID[name_string]
+    #: suffix appended to standard labels on write (v2.0.0 appended ``'_best'``)
+    label_suffix = '_bm'
+
+    def _standard_base(self, name_string):
+        """
+        Base label if ``name_string`` is a standard label that v2.0.0 wrote with the
+        ``'_best'`` suffix (``'N2'``, ``'IED'``, ``'seizure'``, ...), given bare or with a
+        ``'_bm'``/``'_best'`` suffix; otherwise ``None``.
+        """
+        for suffix in (self.label_suffix, '_best'):
+            if name_string.endswith(suffix) and name_string[:-len(suffix)] + '_best' in self.standard_UUID:
+                return name_string[:-len(suffix)]
         if name_string + '_best' in self.standard_UUID:
-            return self.standard_UUID[name_string + '_best']
+            return name_string
         return None
+
+    def written_name(self, name_string):
+        """
+        Name under which a label is written: standard labels get the ``'_bm'`` suffix
+        (``'N2'``, ``'N2_best'`` and ``'N2_bm'`` are all written as ``'N2_bm'``); any
+        other label is written exactly as given.
+        """
+        base = self._standard_base(name_string)
+        return name_string if base is None else base + self.label_suffix
+
+    def _standard_uuid(self, name_string):
+        """
+        Type UUID written for a label, identical to v2.0.0: standard labels use the
+        UUID v2.0.0 wrote for ``label + '_best'`` (e.g. ``'IED'`` ->
+        ``...000000000011``), other labels in ``standard_UUID`` (e.g.
+        ``'Sleep stage N2'``) their own entry, anything else ``None`` (random UUID).
+        """
+        base = self._standard_base(name_string)
+        if base is not None:
+            return self.standard_UUID[base + '_best']
+        return self.standard_UUID.get(name_string)
 
     def add_AnnotationType(self, name_string="", groupAssociationId=None, color='#FF6C1FBA', note="", startsWithEpoch=False, stdDurationInSec=0):
         """
-        Add an annotation type. The type is written with exactly ``name_string`` as
-        its name (so a save/load round trip preserves labels). Standard labels
-        (``'N2'``, ``'N2_best'``, ...) get the stable UUID from ``standard_UUID``.
+        Add an annotation type.
+
+        Standard labels (those with a ``'<label>_best'`` entry in ``standard_UUID``:
+        ``AWAKE, N1, N2, N3, REM, UNKNOWN, Arousal, N, SLP, IED, seizure, seizure_05,
+        seizure_08``) are written as ``'<label>_bm'`` with the same stable UUID that
+        v2.0.0 used for ``'<label>_best'``; ``'<label>_best'`` and ``'<label>_bm'`` given
+        as input map to the same type. Every other label is written exactly as given
+        (with its ``standard_UUID`` entry if it has one, else a random UUID).
+        :func:`brainmaze_utils.annotations.load_CyberPSG` strips ``'_bm'`` (and the
+        legacy ``'_best'``) again.
         """
         if name_string.__len__() == 0:
             name_string = 'AnnotationType{0}'.format(self.AnnotationTypes.__len__())
+
+        uuid_key = self._standard_uuid(name_string)
+        name_string = self.written_name(name_string)
 
         for AnnotationType in self.AnnotationTypes.AnnotationType:
             if AnnotationType.name[0].param == name_string:
                 raise KeyError("AnnotationType \"" + name_string + "\" already exists!")
 
-        uuid_key = self._standard_uuid(name_string)
         if uuid_key is None or uuid_key in self.AnnotationTypeIDs:
             uuid_key = str(uuid.uuid4())
 
@@ -353,6 +391,8 @@ class CyberPSG_XML_Writter:
 
         if isinstance(AnnotationTypeId, str):
             is_AType_set = False
+            if AnnotationTypeId not in self.AnnotationTypeKeys:
+                AnnotationTypeId = self.written_name(AnnotationTypeId)  # 'N2' -> 'N2_bm'
             for idx, ATypepName in enumerate(self.AnnotationTypeKeys):
                 if ATypepName == AnnotationTypeId:
                     AnnotationTypeId = idx
