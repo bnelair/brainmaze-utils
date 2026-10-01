@@ -90,8 +90,9 @@ def rotate(x, angl):
     Direction convention: points are row vectors multiplied from the right by the
     matrices of :func:`get_rot_2d` / :func:`get_rot_3d` (``x @ R``). This is the
     transpose of the usual column-vector convention, so in 2-D a **positive angle
-    rotates clockwise** (``[1, 0]`` rotated by +90 deg about the origin becomes
-    ``[0, -1]``). In 3-D the rotations are applied in the order x, y, z, each with
+    rotates clockwise**. Rotation is about the **mean of the points** (a single
+    point is therefore unchanged): ``[[0, 0], [2, 0]]`` rotated by +90 deg becomes
+    ``[[1, 1], [1, -1]]``. In 3-D the rotations are applied in the order x, y, z, each with
     the same row-vector convention. Negate the angle(s) for counter-clockwise
     rotation.
     """
