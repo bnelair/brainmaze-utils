@@ -55,3 +55,32 @@ def test_kl_divergence_eps_smoothing():
         kl_divergence_nonparametric([1, -1], [1, 1])
     with pytest.raises(ValueError):
         kl_divergence_nonparametric([1, 1], [1, 1, 1])
+
+
+def test_kl_2d_is_sum_of_row_kls_v2_scale():
+    # brainmaze-eeg passes (n_features, n_bins) stacks of normalised histograms (review R5):
+    # the value must equal v2.0.0's sum(p * log(p / q)) over all rows, not that / n_features
+    rng = np.random.default_rng(0)
+    P = rng.uniform(0.1, 1, (4, 200))
+    Q = rng.uniform(0.1, 1, (4, 200))
+    P /= P.sum(axis=1, keepdims=True)
+    Q /= Q.sum(axis=1, keepdims=True)
+    v2 = np.nansum(P * np.log(P / Q))
+    assert kl_divergence_nonparametric(P, Q) == pytest.approx(v2, rel=1e-12)
+    assert kl_divergence_nonparametric(P, Q) == pytest.approx(
+        sum(kl_divergence_nonparametric(P[i], Q[i]) for i in range(4)), rel=1e-12)
+    # raw counts per row are normalised per row
+    assert kl_divergence_nonparametric(P * 1000, Q * 7) == pytest.approx(v2, rel=1e-12)
+    with pytest.raises(ValueError):
+        kl_divergence_nonparametric(P, Q[:, :100])
+    Z = P.copy()
+    Z[2] = 0
+    with pytest.raises(ValueError):  # one empty row
+        kl_divergence_nonparametric(Z, Q)
+
+
+@pytest.mark.parametrize('eps', [np.nan, np.inf, -1e-3, 0.0])
+def test_kl_eps_must_be_finite_positive(eps):
+    # Copilot: eps=nan/inf used to slip through and return a non-finite/0 result
+    with pytest.raises(ValueError):
+        kl_divergence_nonparametric([1, 0], [0, 1], eps=eps)

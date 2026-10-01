@@ -240,3 +240,18 @@ def test_downsample_min_max_ignores_nan():
     x[3] = np.nan
     y, _ = downsample_min_max(x, 100, 10)
     np.testing.assert_array_equal(y, [0, 19, 20, 39])
+
+
+def test_resample_empty_input():
+    # Copilot: reshape(-1, 0) raised before the empty branch was reached
+    assert resample(np.array([]), 1000, 250).shape == (0,)
+    assert resample(np.zeros((3, 0)), 1000, 250).shape == (3, 0)
+    assert resample(np.ones(1), 1000, 250).shape == (0,)
+
+
+def test_resample_short_gap_can_vanish_when_downsampling_decimate_keeps_it():
+    # documented (review R7): resample only looks at the two bracketing samples
+    x = np.ones(4000)
+    x[2001:2004] = np.nan
+    assert not np.isnan(resample(x, 1000, 250)).any()
+    assert np.isnan(decimate(x, 1000, 250)).sum() >= 1

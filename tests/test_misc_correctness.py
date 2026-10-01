@@ -42,16 +42,28 @@ def test_rotate_direction_documented():
     np.testing.assert_array_equal(x, [[0, 0], [2, 0]])
 
 
-def test_objdict_missing_attribute_does_not_create_key():
+def test_objdict_attribute_autovivification_kept_and_copy_pickle_work():
+    import copy
+    import pickle
     d = ObjDict()
-    assert not hasattr(d, 'missing')
-    assert 'missing' not in d
-    with pytest.raises(AttributeError):
-        d.missing
+    d.cfg.sub = 3  # v2.0.0 behaviour (review R8): nested attribute assignment creates the parent
+    assert d == {'cfg': {'sub': 3}} and isinstance(d.cfg, ObjDict)
+    d['b']['c'] = 2
+    assert d.b.c == 2
     d.a = 1
     assert d['a'] == 1 and d.a == 1
-    d['b']['c'] = 2  # item auto-vivification still works
-    assert d.b.c == 2
+    # private/dunder names never auto-create (this used to break deepcopy/pickle)
+    assert not hasattr(d, '__array__') and not hasattr(d, '_repr_html_')
+    with pytest.raises(AttributeError):
+        d._missing
+    assert '_missing' not in d and '__array__' not in d
+    c = copy.deepcopy(d)
+    assert c == d and c.cfg is not d.cfg and isinstance(c.cfg, ObjDict)
+    c.cfg.sub = 4
+    assert d.cfg.sub == 3
+    p = pickle.loads(pickle.dumps(d))
+    assert p == d and p.b.c == 2
+    assert copy.copy(d) == d
 
 
 def test_get_files_only_skips_appledouble(tmp_path):

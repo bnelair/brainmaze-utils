@@ -33,7 +33,8 @@ filtering utilizing downsampling, buffering etc.
      - mean-filled for filtering, re-masked in the output
    * - :func:`resample`
      - **no** - interpolation only, by design; low-pass first when downsampling
-     - never interpolated across; NaN propagates to adjacent output samples
+     - never interpolated across; an output is NaN if a bracketing input sample is.
+       When downsampling, a gap shorter than one output period can vanish
    * - :func:`unify_sampling_frequency`
      - yes (calls :func:`decimate`)
      - as :func:`decimate`
@@ -1222,7 +1223,13 @@ def resample(x, fsamp_orig, fsamp_new):
     -----
     - NaN handling: an output sample is NaN if either bracketing input sample is NaN
       (an output time that coincides with an input sample uses only that sample).
-      Values are never interpolated across a gap.
+      Values are never interpolated across a gap. **When downsampling, short gaps can
+      disappear:** a gap that falls entirely between two output instants marks no
+      output sample (e.g. a 3-sample gap, 1000 -> 250 Hz, gives no NaN at all). Use
+      :func:`decimate` if the gap mask must be preserved (it flags every output
+      sample within half an output period of a NaN).
+    - Empty input (or an output of 0 samples) returns an empty array of shape
+      ``x.shape[:-1] + (n_new,)``.
     - Output times beyond the last input sample (possible when upsampling) take the
       last input value.
 
@@ -1241,10 +1248,10 @@ def resample(x, fsamp_orig, fsamp_new):
     n = x.shape[-1]
     n_new = int(np.round(n * fsamp_new / fsamp_orig))
     lead_shape = x.shape[:-1]
+    if n == 0 or n_new == 0:  # before reshape(-1, n): -1 cannot be inferred when n == 0
+        return np.full(lead_shape + (n_new,), np.nan)
     x2 = x.reshape(-1, n)
     out = np.full((x2.shape[0], n_new), np.nan)
-    if n == 0 or n_new == 0:
-        return out.reshape(lead_shape + (n_new,))
 
     pos = np.arange(n_new) * (fsamp_orig / fsamp_new)  # output times in input-sample units
     pos = np.minimum(pos, n - 1)

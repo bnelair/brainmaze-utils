@@ -96,49 +96,68 @@ def combine_mvgauss_distributions(mu1, var1, N1, mu2, var2, N2):
 
 def kl_divergence_nonparametric(pk, qk, eps=None):
     """
-    KL divergence ``D(P || Q)`` between two discrete distributions (e.g. histograms
-    with identical bins), in nats.
+    KL divergence ``D(P || Q)`` between discrete distributions (e.g. histograms with
+    identical bins), in nats.
 
-    ``pk`` and ``qk`` are normalised to sum to 1 first, so raw counts may be passed.
-    Bins with ``p == 0`` contribute 0.
+    The **last axis** holds the bins. A 1-D input is one distribution; an N-D input
+    is a stack of distributions (e.g. ``(n_features, n_bins)``, one histogram per
+    row), and the result is the **sum of the per-row divergences** (as in v2.0.0).
+    Each distribution is normalised to sum to 1 along the last axis first, so raw
+    counts may be passed. Bins with ``p == 0`` contribute 0.
 
     Parameters
     ----------
     pk, qk : array_like
-        Non-negative weights/counts over the same bins.
+        Non-negative, finite weights/counts with the same shape, bins on the last
+        axis. Every distribution (row) must have positive total mass.
     eps : float, optional
         If ``None`` (default) no smoothing is applied and the result is ``inf``
         whenever some bin has ``p > 0`` and ``q == 0`` (P is not absolutely
-        continuous w.r.t. Q). If given, ``eps`` is added to **every** bin of both
-        distributions (after normalisation) and they are re-normalised, giving a
-        finite, smoothed estimate.
+        continuous w.r.t. Q). If given (finite, ``> 0``), ``eps`` is added to **every**
+        bin of both distributions (after normalisation) and they are re-normalised,
+        giving a finite, smoothed estimate.
 
     Returns
     -------
     float
-        ``sum(p * log(p / q))``, ``>= 0``; ``inf`` as described above.
+        ``sum(p * log(p / q))`` over all bins (and rows), ``>= 0``; ``inf`` as
+        described above.
+
+    Raises
+    ------
+    ValueError
+        If the shapes differ, any value is negative or not finite, a distribution
+        has zero total mass, or ``eps`` is not a finite positive number.
 
     Notes
     -----
     .. note:: **Changed after v2.0.0:**
        Bins with ``q == 0, p > 0`` were silently dropped (returning e.g. 0.0 instead
-       of inf) and the inputs were not normalised.
+       of inf). Inputs were not normalised: for already normalised histograms the
+       result is unchanged (also for 2-D stacks of normalised rows, which is how
+       brainmaze-eeg calls it), but **raw counts now give the KL divergence of the
+       normalised histograms** instead of ``sum(c_p * log(c_p / c_q))``, which
+       scaled with the number of samples and was not a divergence. Invalid input
+       (negative, NaN/inf, zero mass, different shapes) now raises ``ValueError``.
     """
-    p = np.asarray(pk, dtype=float).ravel()
-    q = np.asarray(qk, dtype=float).ravel()
+    p = np.atleast_1d(np.asarray(pk, dtype=float))
+    q = np.atleast_1d(np.asarray(qk, dtype=float))
     if p.shape != q.shape:
-        raise ValueError(f'pk and qk must have the same number of bins, got {p.size} and {q.size}')
+        raise ValueError(f'pk and qk must have the same shape, got {p.shape} and {q.shape}')
     if np.any(p < 0) or np.any(q < 0) or not np.all(np.isfinite(p)) or not np.all(np.isfinite(q)):
         raise ValueError('pk and qk must be finite and non-negative')
-    if p.sum() <= 0 or q.sum() <= 0:
-        raise ValueError('pk and qk must have positive total mass')
-    p = p / p.sum()
-    q = q / q.sum()
+    p_mass = p.sum(axis=-1, keepdims=True)
+    q_mass = q.sum(axis=-1, keepdims=True)
+    if np.any(p_mass <= 0) or np.any(q_mass <= 0):
+        raise ValueError('every distribution in pk and qk (each row along the last axis) must have positive total mass')
+    p = p / p_mass
+    q = q / q_mass
     if eps is not None:
-        if eps <= 0:
-            raise ValueError('eps must be > 0')
-        p = (p + eps) / (1 + eps * p.size)
-        q = (q + eps) / (1 + eps * q.size)
+        if not (np.isfinite(eps) and eps > 0):
+            raise ValueError(f'eps must be a finite number > 0, got {eps!r}')
+        n_bins = p.shape[-1]
+        p = (p + eps) / (1 + eps * n_bins)
+        q = (q + eps) / (1 + eps * n_bins)
     support = p > 0
     if np.any(q[support] == 0):
         return np.inf
