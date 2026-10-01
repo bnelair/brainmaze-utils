@@ -33,16 +33,20 @@ Signal-processing conventions
 - **Which functions filter?**
 
   - ``signal.decimate``: anti-aliasing low-pass included (16th-order Butterworth in second-order
-    sections, zero-phase, default cutoff ``fs_new / 3``), then downsampling. Use this to reduce the
-    sampling rate.
+    sections, zero-phase, default cutoff ``fs_new / 3``), then resampling to exactly ``k / fs_new``
+    (any ratio, including non-round rates such as 30000.5 Hz; it also upsamples). Use this to
+    change the sampling rate.
   - ``signal.resample``: **no anti-aliasing filter, by design.** It only interpolates. When
     downsampling, low-pass the signal below the new Nyquist frequency first, or use ``decimate``.
     Otherwise content above ``fs_new / 2`` aliases into the output.
   - ``signal.nandecimate``: weak 30-tap FIR anti-aliasing (legacy); prefer ``decimate``.
   - ``signal.LowFrequencyFilter``: zero-phase low-/high-pass for very low cutoffs (e.g. a 0.5 Hz
     high-pass on 8 kHz data) via a decimate/filter/upsample cascade. DC offset and linear drift
-    are handled exactly at the record edges, so there are no start/end jumps.
-  - ``signal.fft_filter``: brick-wall FFT filter (rings at transients and edges).
+    are handled exactly at the record edges, so there are no start/end jumps. NaN gaps are
+    handled (short ones bridged, long ones split into segments with the same edge handling);
+    the output is NaN exactly where the input is, so it can follow ``decimate`` in a cascade.
+  - ``signal.fft_filter``: brick-wall FFT filter (rings at transients; record edges periodic by
+    default, ``edges='extend'`` for the edge handling above). NaN gaps handled as above.
 
 .. code-block:: python
 
