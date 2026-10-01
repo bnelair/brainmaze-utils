@@ -16,9 +16,10 @@ Recommended pipeline
 
     gaps = find_gaps(x)                       # 1. on the ORIGINAL signal: (n_gaps, 2) samples
     y = fill_gaps(x, fs)                      # 2. finite copy, same shape and float dtype
-    det = my_detector(y, fs)                  # 3. any detector (here: times in seconds)
-    det = drop_in_gaps(det, gaps / fs, fs,    # 4. ALWAYS drop detections in / near gaps
-                       units='seconds',       #    units of BOTH det and gaps (see below)
+    det = my_detector(y, fs)                  # 3. any detector (here: sample indices)
+    det = drop_in_gaps(det, gaps, fs,         # 4. ALWAYS drop detections in / near gaps
+                       units='samples',       #    units of det (and end)
+                       gap_units='samples',   #    units of gaps (find_gaps: samples)
                        margin_s=0.1)
 
 Step 4 is not optional: whatever fills a gap is not data, and an event detected there (or
@@ -38,7 +39,7 @@ seconds around the gap and produces bursts of false detections there; a fill wit
 much power in the detector's band raises it and hides real events next to the gap; and a
 hard step or kink at a gap edge rings through every filter. The fill therefore has to
 *look like the neighbouring background* (same level, same power in every band) and must
-join the data without steps or kinks.
+join the data the way the data joins itself.
 
 Fill methods
 ------------
@@ -46,61 +47,85 @@ Fill methods
   ``method='linear'``: linear interpolation between the two edge samples (constant
   extension for a gap at the start or end). All short gaps are filled in one vectorised
   step, so packet-loss-like recordings with thousands of tiny gaps are cheap.
-- **Long gaps**, ``method='spectral'`` (**default**): Gaussian noise with the *power
-  spectrum of the neighbouring data*. The PSD is estimated from up to ``context_s`` of
-  valid data on each side of the gap (Welch, Hann window, half-overlapping segments of
-  the gap length rounded up to a power of two, at most ~1 s). It is robust to spikes and
-  artifacts in the context: segments whose log power in any of four log-spaced bands
-  exceeds the median over segments by more than 3 robust SDs (MAD; at least 2x) are
-  dropped before averaging. (A plain median Welch was biased low on real, non-stationary
-  EEG and still let a few large spikes in the context inflate the fill by 20-30 %.) Each FFT bin of the fill gets the power that the context
-  has in that frequency band (random phase, Rayleigh amplitude), so the fill matches the
-  neighbours band by band
-  (the 1/f slope, alpha or other peaks, line noise, the white noise floor) rather than
-  only in total RMS. It rides on the local level (median of the 0.5 s next to each edge,
-  linearly bridged across the gap).
-- **Long gaps**, ``method='pink'``: unit-variance 1/f^``beta`` noise scaled to the robust
-  (MAD) amplitude of the context, on the same level bridge. The spectral *shape* is fixed,
-  so its band powers generally differ from the data (see below); kept for comparison and
-  for data that really is 1/f^beta.
+- **Long gaps**, ``method='spectral'`` (**default**): noise with the *power spectrum of
+  the neighbouring data*, conditioned on the samples at the gap edges (see "Edges").
+  The spectrum is a Welch estimate (Hann window, half-overlapping segments) from up to
+  ``context_s`` of data on each side. The segment is the gap length rounded up to a
+  power of two, but at least ~1 s (so the delta band is in the spectrum) and at most
+  ~8 s (0.12 Hz resolution for long gaps, so a 0.75 Hz slow oscillation is not smeared
+  into 1-4 Hz) and at most half the context. Only segments made of *original* samples
+  are used when there are at least three (interpolated short gaps and earlier fills have
+  no high-frequency power); with dense packet loss the spectrum above ``2 fs / k`` comes
+  from the longest original-only segments (length k). The estimate is robust to spikes
+  and artifacts in the context: a segment is dropped when its log power exceeds the
+  median over segments by more than max(3 MAD, log 2) in at least two of four log-spaced
+  bands (spikes, pops and movement are broadband), or by more than max(5 MAD, log 16) in
+  any one band; the remaining segments are averaged. Physiological bursts (spindles,
+  alpha/beta bursts) raise one band by less than that and are kept. Every frequency bin
+  of the fill gets exactly the power that the context has there (random phase), so the
+  fill matches the neighbours band by band (the 1/f slope, alpha or other peaks, the
+  white noise floor) rather than only in total RMS. It rides on the local level (median
+  of the 0.5 s next to each edge, linearly bridged across the gap).
+- **Long gaps**, ``method='pink'``: 1/f^``beta`` noise (from ``1 / gap`` up) scaled to
+  the robust (MAD) amplitude of the context, on the same level bridge and with the same
+  edge conditioning. The spectral *shape* is fixed, so its band powers generally differ
+  from the data (see below), and so does its roughness at the junctions; kept for
+  comparison and for data that really is 1/f^beta.
 - **Long gaps**, ``method='mirror'``: the neighbouring signal mirrored into the gap from
   both sides, the two images cross-faded over the whole gap with an amplitude correction
-  that accounts for the measured correlation of the two images. Keeps the local spectrum,
-  but copies real neighbouring events (e.g. a spike next to the gap) into the gap.
+  that accounts for the measured correlation of the two images, plus a 10 ms point
+  reflection blend at each edge. Keeps the local spectrum, but copies real neighbouring
+  events (e.g. a spike next to the gap) into the gap.
 
-Smooth edges (``'spectral'`` and ``'pink'``): over ``taper_s`` (default 0.5 s, at most
-half the gap) at each edge the fill starts as the **point (odd) reflection** of the
-neighbouring data, ``2*x[s-1] - x[s-2-k]``, which continues both the value *and the slope*
-of the signal at the edge, and is cross-faded into the noise with **power-complementary**
-raised-cosine weights (``cos``/``sin``), so the band power does not dip in the taper
-either. ``'mirror'`` gets the same odd reflection over the first 10 ms. The filled signal
-is continuous in value and slope at both edges.
+Edges
+-----
+For ``'spectral'`` and ``'pink'`` the noise is a **conditional simulation** of the
+Gaussian process with that spectrum, given ~20 ms (4-64 samples) of data on each side of
+the gap (kriging with the autocovariance of the same spectrum). The fill therefore
+continues the data exactly as far as the data's own autocorrelation reaches: a smooth
+signal keeps its value and slope, an oscillation keeps its phase into the gap, and white
+noise carries nothing over (no low-frequency bump from one noisy edge sample). The
+variance is right everywhere, so the band power neither dips nor bulges at the edges, and
+the junction is statistically like the data's own sample-to-sample steps. Edge residuals
+larger than 4 robust SD of the neighbouring data (e.g. an artifact cut by the dropout)
+are clipped before conditioning, so an artifact at the edge is not continued into the
+gap. ``taper_s`` (default 0.5 s) bounds how far into the gap the conditioning acts (the
+whole gap if it is shorter than ``2 * taper_s``; faded out over the second half of
+``taper_s``). ``taper_s=0`` gives unconditioned noise with a step at each edge.
 
 Units (post-filters)
 --------------------
-``mask_in_gaps`` / ``drop_in_gaps`` take a **required** ``units='seconds'|'samples'``
-that applies to the detections *and* to the gaps; ``margin_s`` is always in seconds and
-``fs`` is always required. Gaps from :func:`find_gaps` are sample indices, from
-:func:`gap_intervals` seconds; detections are whatever your detector returns (e.g.
-eeg_forge's Janca returns sample indices). Mix-ups raise instead of silently masking
-nothing: integer-dtype gaps with ``units='seconds'`` and non-integer values with
-``units='samples'`` are rejected. Convert one side first when they differ
-(``gaps / fs`` or ``det / fs``).
+``mask_in_gaps`` / ``drop_in_gaps`` take **two required** keywords: ``units`` for the
+detections (and ``end``) and ``gap_units`` for the gaps, each ``'seconds'`` or
+``'samples'``; ``margin_s`` is always in seconds and ``fs`` is always required. Gaps from
+:func:`find_gaps` are sample indices, from :func:`gap_intervals` seconds; detections are
+whatever your detector returns (e.g. eeg_forge's Janca returns sample indices). Because
+each side is stated separately, detections in samples work against gaps in seconds (and
+vice versa) without conversion, and a units mix-up cannot hide behind one shared keyword.
+Integer-typed values with ``'seconds'`` raise (sample indices declared as seconds; pass
+genuine whole seconds as floats), and non-integral values with ``'samples'`` raise
+(floats within 1e-6 of an integer, such as ``t * fs``, are accepted).
 
 Randomness
 ----------
-``seed`` (default 0, reproducible) may be an int, a sequence of ints, ``None`` (fresh
-entropy), a :class:`numpy.random.SeedSequence` or a :class:`numpy.random.Generator`. The
-noise of every long gap is drawn from its own stream derived from the seed, the gap's
-position *and a hash of the context data next to it*. Consequently:
+``seed`` (default 0) may be an int, a sequence of ints, ``None`` (fresh entropy), a
+:class:`numpy.random.SeedSequence` or a :class:`numpy.random.Generator`. The noise of
+every long gap is drawn from its own stream derived from the seed, the gap's length and a
+hash of the context data next to it, **quantised to 1/1000 of its robust SD** around its
+median. Consequently:
 
 - a channel's fill does not depend on other channels, their gaps or their order, nor on
-  the other gaps of the same channel;
+  the other gaps of the same channel (as long as they are outside its context);
 - the same channel gives the same fill in a 1-D call and inside an N-D call;
+- the fill is the same across machines and numpy/scipy versions, and after upstream
+  processing that differs at the rounding (ulp) level; for data rescaled (uV vs V) or
+  cast to float32; and for the same gap at another array offset (segment-wise
+  processing), as long as the context is the same. Data that differ by more than about
+  1/1000 SD give a different, independent realisation;
 - different channels sharing a gap (recording-wide dropouts) get **independent** noise,
   also when they are filled one at a time in separate calls with the same seed, so
   bipolar/CAR montages, coherence and connectivity do not see spuriously identical
-  segments. (Two channels with bit-identical context data get identical fills.)
+  segments. (Two channels whose context data are equal up to scale get identical fills.)
 
 Defaults and the evidence behind them
 -------------------------------------
@@ -108,39 +133,47 @@ Defaults and the evidence behind them
 ``<= 0.05 s`` made no difference for any method, while straight lines over 0.5 s gaps
 already produced false detections; 0.1 s also matches the default post-filter margin.
 
-``method='spectral'``: measured on real Fz-Cz EEG (500 Hz, 30-40 gaps per length) and on
-a synthetic 1/f^2 + 10 Hz + 60 Hz + white background at 5 kHz (probes and full tables in
-brainmaze-utils PR #26):
+``method='spectral'``: measured on real Fz-Cz EEG (500 Hz, 20-40 gaps per length) and on
+synthetic backgrounds (probes and tables in brainmaze-utils PR #26):
 
-- band RMS of the fill / band RMS of the neighbouring data, median over gaps, bands from
-  0.5 Hz to 1 kHz: ``'spectral'`` 0.92-1.05 for 10-60 s gaps and 0.74-1.25 for 1-2 s
-  gaps (the scatter of a short realisation in narrow low bands; 10-1000 Hz bands stay
-  within 0.89-1.03 at every length). ``'pink'``: 1.3-2.1 in 4-200 Hz on real data and
-  about 5 in 80-1000 Hz at 5 kHz, because its 1/f shape is fixed;
+- band RMS of the fill / band RMS of the neighbouring data, median over gaps, 0.5 Hz to
+  1 kHz: ``'spectral'`` 0.93-1.07 for 2-60 s gaps and 0.84-0.99 for 1 s gaps (real),
+  0.88-1.05 for 1-60 s gaps at 5 kHz; pooled over 39 gaps of stationary synthetic
+  data 0.81-1.19 also for 0.15-0.5 s gaps. In 0.2-0.5 s gaps the delta band (0.5-4 Hz)
+  of real EEG is under-filled (0.57-0.76; frequencies below ~1/gap cannot be represented).
+  ``'pink'``: 1.4-3.2 in 4-200 Hz on real data and about 5-7 in 80-1000 Hz at 5 kHz,
+  because its 1/f shape is fixed;
+- slow oscillation (0.75 Hz) + white noise, 30 s gaps: 0.6-1 Hz 0.94, 1-2 Hz 1.5, 2-4 Hz
+  0.99 (with the former ~1 s Welch segment: 0.38 / 6.7 / 7.7);
+- noisy (white-dominated) edges, 5 s gaps: 1-4 Hz power in the first 0.5 s of the fill
+  1.65x the original, the same as unconditioned noise (the former one-sample point
+  reflection: 181x); 1-4 Hz difference in the valid data 0.1-1 s before the gap 0.50
+  band-SD median (point reflection: 6.1);
+- a 300 uV artifact cut by the dropout: max ``|fill - level|`` in the first 0.5 s 3.7 SD
+  (point reflection: 19.9 SD, ``'mirror'``: 10.7 SD); junctions on real EEG are
+  statistically like the data's own (2nd difference p90 3.2-3.8 vs 3.4 for the data);
 - an RMS (80-500 Hz, 10 s window) background threshold in the *valid* data 0.1-4 s
   outside a gap, filled / gap-free: ``'spectral'`` 1.00 and ``'mirror'`` 0.99-1.00 for
-  0.5, 2 and 10 s gaps; ``'pink'`` 1.34 / 2.28 / 2.77, i.e. an RMS-threshold detector
+  0.5, 2 and 10 s gaps; ``'pink'`` 1.69 / 2.67 / 2.94, i.e. an RMS-threshold detector
   misses real events next to a pink-filled gap;
 - eeg_forge's Janca threshold 0.1-2.5 s outside a gap, filled / gap-free (0.2-60 s gaps):
-  ``'spectral'`` median 0.98-1.00, p90 <= 1.07; ``'mirror'`` p90 <= 1.04; ``'pink'``
-  p90 up to 1.19;
+  ``'spectral'`` median 0.99-1.01, p90 <= 1.09; ``'mirror'`` p90 <= 1.04;
+  ``'pink'`` p90 up to 1.23;
 - Janca detections (1 h, 23 gaps per length, 0.5-60 s, transients injected 0.15-1.2 s
   outside both edges, ``drop_in_gaps`` margin 0.1 s): no false detections near the gaps
-  for ``'spectral'``, ``'pink'`` or ``'mirror'`` (``'linear'``: 9-415). With strong
-  transients all three find 100 %. With weak ones (near the threshold) the sensitivity at
-  0.15 s from the edge is 0.74-0.91 gap-free, 0.65-0.76 with ``'spectral'``, 0.41-0.78
-  with ``'mirror'`` (it copies the transients into the gap, raising the background) and
-  0.26-0.67 with ``'pink'``.
+  for ``'spectral'`` or ``'mirror'`` (``'linear'``: 12-415). With strong transients both
+  find 100 %. With weak ones (near the threshold) the sensitivity at 0.15 s from the
+  edge is 0.74-0.91 gap-free, 0.72-0.85 with ``'spectral'`` and 0.41-0.78 with
+  ``'mirror'`` (it copies the transients into the gap, raising the background).
 
 ``'spectral'`` is the default because it is the only fill that keeps the background of
 the neighbouring data in every band without copying neighbouring events (spikes,
-artifacts) into the gap; its Welch estimate also rejects such events in the
-context.
-``context_s=10``: enough Welch segments for a stable PSD of a 60 s gap; shorter
-gaps use proportionally less (about 16 half-overlapping Welch segments, segment = gap length rounded up to
-a power of two, at most ~1 s), so the cost scales with the gap, not with
-``fs * context_s``. ``taper_s=0.5``: removed the false detections that a hard junction
-produced in the benchmark.
+artifacts) into the gap; its Welch estimate also rejects such events in the context.
+``context_s=30``: room for the 8 s Welch segments of long gaps (>= 3 per side; with 10 s
+the slow-oscillation test above gave 1-2 Hz 3.3x); shorter gaps use about 16 gap lengths
+(at least three ~1 s segments) per side, so the cost scales with the gap.
+``taper_s=0.5``: covers the autocorrelation of typical EEG; the conditioning is exact
+within it.
 
 Limitations
 -----------
@@ -148,11 +181,28 @@ Limitations
   spindles or other non-stationary structure, nor the phase relations between channels
   (each channel is filled independently). Do not compute features that depend on the
   content of the gap (event rates, coherence, phase) without excluding the gaps.
+- Bursty rhythms are filled at their *average* power: with the two-band rejection rule
+  the burst band of the fill is 0.94-1.04 of the context for spindles and alpha/beta
+  bursts (it was 0.62-0.91 with a one-band rule). The price: a single narrow-band
+  artifact below 16x is kept (0.3 s, 600 uV movement artifacts every 5 s next to a 1 s
+  gap: 1-4 Hz 1.24x of the clean background instead of 1.10x; spikes in the context are
+  still rejected: 10-60 Hz 0.98-1.04, 1.7x without rejection).
+- For gaps >= ~4 s the Welch segments are 8 s long; artifacts that recur more often than
+  that are in every segment and cannot be rejected: the movement artifacts above give
+  1-4 Hz 3.5x next to a 5 s gap (10-60 Hz unaffected, 0.99).
 - The spectrum is estimated from at most ``context_s`` on each side; if the state changes
   across the gap the fill uses the average of both sides. With fewer than 16 valid
   context samples the fill falls back to ``'pink'`` scaled by the MAD of what is there.
-- Frequencies below about 0.5 Hz (or ``1 / gap`` for short gaps) are represented only by
-  the level bridge; the fill has no infra-slow drift.
+- Frequencies below about ``1 / segment`` (0.12-1 Hz) are represented only by the level
+  bridge and the edge conditioning; the fill has no infra-slow drift. A strong narrow
+  peak (a 0.75 Hz slow oscillation) still leaks ~1.5x into the neighbouring band.
+- Remove line noise before filling: in the shortest long gaps (<= ~0.15 s) the line in
+  the fill is not phase-locked to the data and passes a notch (40 uV 50 Hz, eeg_forge
+  Janca 10-60 Hz band with a 50 Hz notch: 2.4x in 0.13 s gaps, 0.94-1.04 in 0.2-1 s
+  gaps, where the conditioning keeps the line's phase).
+- With dense packet loss (no ~1 s stretch of original data) the spectrum below
+  ``2 fs / k`` (see above) comes from segments that include interpolated samples and is
+  biased low.
 - A detector's background estimate *straddling* a gap is still partly made of fill, so the
   post-filter margin should cover the detector's own edge sensitivity (default 0.1 s;
   increase it for detectors with long filters or windows).
@@ -162,6 +212,10 @@ Limitations
 - ``'mirror'`` corrects its cross-fade amplitude with the *broadband* correlation of the
   two mirror images; a narrow-band coherent component such as line noise can still come
   out ~1.1-1.3x too strong in short gaps (it was up to 1.5x without the correction).
+- Cost: a long gap at 32 kHz takes ~0.5 s per minute of gap (10 min: ~5 s) and
+  allocates ~5.6-5.8x the gap length in float64 temporaries (30 min at 32 kHz: ~2.5 GiB);
+  medium gaps (0.1-0.5 s) at 32 kHz take ~25-55 ms each (1500 of 0.12 s in 10 min:
+  ~40 s). Fill very long gaps at a lower rate, or split the recording.
 - A channel that is entirely NaN/inf cannot be filled; see ``all_nan``.
 """
 
@@ -644,10 +698,9 @@ def _fill_long(y, ok, s, e, nxt, fs, p, root):
     method = p['method']
     if method == 'spectral':
         nps = _nperseg(n, fs, p['ctx'])
-        # context per side: ~16 gap lengths (rounded up to 2^k) but at most 7 Welch segments
-        # (4 nps) unless that is shorter than 3 segments (2 nps)
-        L = int(min(p['ctx'], max(2 * nps, min(16 * (1 << int(np.ceil(np.log2(max(n, 2))))),
-                                                4 * nps))))
+        # context: ~16 gap lengths (rounded up to 2^k) per side, at least 3 Welch segments
+        # (fewer segments made the artifact rejection weaker: r3/v3_rules.current.out)
+        L = int(min(p['ctx'], max(16 * (1 << int(np.ceil(np.log2(max(n, 2))))), 2 * nps)))
     else:
         nps, L = 0, p['ctx']
     lo, hi = max(s - L, 0), min(e + L, N)
