@@ -49,11 +49,13 @@ Fill methods
 - **Long gaps**, ``method='spectral'`` (**default**): Gaussian noise with the *power
   spectrum of the neighbouring data*. The PSD is estimated from up to ``context_s`` of
   valid data on each side of the gap (Welch, Hann window, half-overlapping segments of
-  the gap length rounded up to a power of two, at most ~1 s). It is made robust to spikes
-  and artifacts in the context: segments whose power in any of four log-spaced bands
-  exceeds 4x the median over segments are dropped, and the rest are combined by a
-  (bias-corrected) **median** instead of a mean. Each FFT bin of the fill gets the power that the context has in that frequency
-  band (random phase, Rayleigh amplitude), so the fill matches the neighbours band by band
+  the gap length rounded up to a power of two, at most ~1 s). It is robust to spikes and
+  artifacts in the context: segments whose power in any of four log-spaced bands exceeds
+  8x the median over segments are dropped before averaging. (A plain median Welch was
+  biased low on real, non-stationary EEG and still let a few large spikes in the context
+  inflate the fill by 20-30 %.) Each FFT bin of the fill gets the power that the context
+  has in that frequency band (random phase, Rayleigh amplitude), so the fill matches the
+  neighbours band by band
   (the 1/f slope, alpha or other peaks, line noise, the white noise floor) rather than
   only in total RMS. It rides on the local level (median of the 0.5 s next to each edge,
   linearly bridged across the gap).
@@ -132,9 +134,9 @@ brainmaze-utils PR #26):
 
 ``'spectral'`` is the default because it is the only fill that keeps the background of
 the neighbouring data in every band without copying neighbouring events (spikes,
-artifacts) into the gap; its median-Welch estimate is also robust to such events in the
+artifacts) into the gap; its Welch estimate also rejects such events in the
 context.
-``context_s=10``: enough Welch segments for a stable median PSD of a 60 s gap; shorter
+``context_s=10``: enough Welch segments for a stable PSD of a 60 s gap; shorter
 gaps use proportionally less (about 16 half-overlapping Welch segments, segment = gap length rounded up to
 a power of two, at most ~1 s), so the cost scales with the gap, not with
 ``fs * context_s``. ``taper_s=0.5``: removed the false detections that a hard junction
@@ -178,6 +180,7 @@ _UNITS = ('seconds', 'samples')
 _ALL_NAN = ('keep', 'zero', 'raise')
 _MIN_SPECTRAL_CONTEXT = 16      # valid samples needed to estimate a PSD
 _MIRROR_KINK_S = 0.01           # odd-reflection blend at the edges of the mirror fill
+_REJECT = 8.0                   # context Welch segment above 8x median band power = artifact
 
 
 # ------------------------------------------------------------------ validation helpers
@@ -284,7 +287,7 @@ def _nperseg(n, fs):
 
 def _cum_power(c, fs, nperseg):
     """
-    Median-Welch PSD of ``c`` as a cumulative power function: returns (edges, cum) such
+    Artifact-robust Welch PSD of ``c`` as a cumulative power function: returns (edges, cum) such
     that ``np.interp(f, edges, cum)`` is the variance of ``c`` in (0, f] (DC excluded).
     """
     nps = int(min(nperseg, c.size))
@@ -294,19 +297,16 @@ def _cum_power(c, fs, nperseg):
     spec = np.fft.rfft((seg - seg.mean(axis=1, keepdims=True)) * win, axis=1)
     pw = spec.real ** 2 + spec.imag ** 2
     if seg.shape[0] > 2:
-        # drop segments with an artifact/spike: power in any of 4 log-spaced bands > 4x the
-        # median over segments; then median Welch, bias-corrected as in scipy.signal.welch
+        # drop segments with an artifact/spike: power in any of 4 log-spaced bands above
+        # _REJECT x the median over segments. Then a plain mean (a median would be biased
+        # low on non-stationary EEG; measured 0.8-0.9 in 0.5-13 Hz on real data).
         nb = pw.shape[1]
         edges = np.unique(np.clip([1, nb // 64, nb // 16, nb // 4], 1, nb - 1))
         bp = np.add.reduceat(pw, edges, axis=1)
-        keep = np.all(bp <= 4.0 * np.median(bp, axis=0), axis=1)
+        keep = np.all(bp <= _REJECT * np.median(bp, axis=0), axis=1)
         if keep.sum() >= 3:
             pw = pw[keep]
-    if pw.shape[0] > 2:
-        i2 = 2.0 * np.arange(1, (pw.shape[0] - 1) // 2 + 1)
-        p = np.median(pw, axis=0) / (1.0 + np.sum(1.0 / (i2 + 1.0) - 1.0 / i2))
-    else:
-        p = pw.mean(axis=0)
+    p = pw.mean(axis=0)
     p = p / (fs * np.sum(win ** 2))
     p[1:] *= 2.0                                        # one-sided
     if nps % 2 == 0:
@@ -522,7 +522,7 @@ def fill_gaps(x, fs, *, max_interp_s=0.1, method='spectral', context_s=10.0, tap
         Gaps up to this length (seconds) are linearly interpolated; longer gaps use
         ``method``. Default 0.1 s.
     method : {'spectral', 'pink', 'mirror', 'linear'}
-        Fill for long gaps. ``'spectral'`` (default): noise with the band powers (median
+        Fill for long gaps. ``'spectral'`` (default): noise with the band powers (robust
         Welch PSD) of the neighbouring data. ``'pink'``: 1/f^beta noise at the MAD
         amplitude of the neighbouring data. ``'mirror'``: neighbouring signal mirrored in
         from both sides (copies neighbouring events into the gap). ``'linear'``: straight
