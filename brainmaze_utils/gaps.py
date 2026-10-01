@@ -50,10 +50,10 @@ Fill methods
   spectrum of the neighbouring data*. The PSD is estimated from up to ``context_s`` of
   valid data on each side of the gap (Welch, Hann window, half-overlapping segments of
   the gap length rounded up to a power of two, at most ~1 s). It is robust to spikes and
-  artifacts in the context: segments whose power in any of four log-spaced bands exceeds
-  8x the median over segments are dropped before averaging. (A plain median Welch was
-  biased low on real, non-stationary EEG and still let a few large spikes in the context
-  inflate the fill by 20-30 %.) Each FFT bin of the fill gets the power that the context
+  artifacts in the context: segments whose log power in any of four log-spaced bands
+  exceeds the median over segments by more than 3 robust SDs (MAD; at least 2x) are
+  dropped before averaging. (A plain median Welch was biased low on real, non-stationary
+  EEG and still let a few large spikes in the context inflate the fill by 20-30 %.) Each FFT bin of the fill gets the power that the context
   has in that frequency band (random phase, Rayleigh amplitude), so the fill matches the
   neighbours band by band
   (the 1/f slope, alpha or other peaks, line noise, the white noise floor) rather than
@@ -180,7 +180,7 @@ _UNITS = ('seconds', 'samples')
 _ALL_NAN = ('keep', 'zero', 'raise')
 _MIN_SPECTRAL_CONTEXT = 16      # valid samples needed to estimate a PSD
 _MIRROR_KINK_S = 0.01           # odd-reflection blend at the edges of the mirror fill
-_REJECT = 8.0                   # context Welch segment above 8x median band power = artifact
+_REJECT_MADS = 3.0              # context Welch segment > median + 3 MAD (log band power) = artifact
 
 
 # ------------------------------------------------------------------ validation helpers
@@ -297,13 +297,16 @@ def _cum_power(c, fs, nperseg):
     spec = np.fft.rfft((seg - seg.mean(axis=1, keepdims=True)) * win, axis=1)
     pw = spec.real ** 2 + spec.imag ** 2
     if seg.shape[0] > 2:
-        # drop segments with an artifact/spike: power in any of 4 log-spaced bands above
-        # _REJECT x the median over segments. Then a plain mean (a median would be biased
-        # low on non-stationary EEG; measured 0.8-0.9 in 0.5-13 Hz on real data).
+        # drop segments with an artifact/spike: log power in any of 4 log-spaced bands above
+        # median + max(3 MAD, log 2) over segments; then a plain mean. (A median Welch was
+        # biased low on non-stationary EEG, a fixed 4-8x threshold either biased or let
+        # clusters of moderate spikes through; scratch/utils-gaps/exp_welch_variants*.)
         nb = pw.shape[1]
         edges = np.unique(np.clip([1, nb // 64, nb // 16, nb // 4], 1, nb - 1))
-        bp = np.add.reduceat(pw, edges, axis=1)
-        keep = np.all(bp <= _REJECT * np.median(bp, axis=0), axis=1)
+        lb = np.log(np.add.reduceat(pw, edges, axis=1) + np.finfo(float).tiny)
+        med = np.median(lb, axis=0)
+        mad = 1.4826 * np.median(np.abs(lb - med), axis=0)
+        keep = np.all(lb <= med + np.maximum(_REJECT_MADS * mad, np.log(2.0)), axis=1)
         if keep.sum() >= 3:
             pw = pw[keep]
     p = pw.mean(axis=0)
