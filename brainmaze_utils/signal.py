@@ -967,7 +967,10 @@ class LowFrequencyFilter:
     10 s 7.5 (split; bridging would give 6.0 and 8.1). The error next to a split
     gap is the record-edge error described below. Leading and trailing NaN are
     simply excluded. A multichannel array whose channels share the same gaps is
-    processed in one pass.
+    processed in one pass. Every split segment is extended by ``3 / cutoff`` s at both
+    ends, so many long gaps cost time: 10 min at 8 kHz (0.5 Hz IIR) takes 1.3 s
+    without gaps, 1.5 s with 500 dropouts, 2.8 s with 50 two-second gaps and 11 s
+    with 300 split segments.
 
     **Record edges.** A filter with a 0.5 Hz cutoff has a transient lasting
     seconds, so what is assumed about the signal beyond the two ends of the record
