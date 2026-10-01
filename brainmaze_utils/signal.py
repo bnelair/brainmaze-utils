@@ -15,6 +15,37 @@ filtering utilizing downsampling, buffering etc.
 - Sampling frequencies and cutoffs are in Hz, durations in seconds.
 - Functions do not modify their inputs.
 - NaN marks missing data (gaps); each function documents how it treats NaN.
+
+**Which functions filter?**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 40 35
+
+   * - Function
+     - Anti-aliasing / filtering
+     - NaN handling
+   * - :func:`decimate`
+     - **yes**: 16th-order Butterworth (SOS, zero-phase), default cutoff ``fs_new / 3``
+     - interpolated for filtering, re-masked in the output
+   * - :func:`nandecimate`
+     - yes, weak: 30-tap FIR (legacy; prefer :func:`decimate`)
+     - mean-filled for filtering, re-masked in the output
+   * - :func:`resample`
+     - **no** - interpolation only, by design; low-pass first when downsampling
+     - never interpolated across; NaN propagates to adjacent output samples
+   * - :func:`unify_sampling_frequency`
+     - yes (calls :func:`decimate`)
+     - as :func:`decimate`
+   * - :func:`downsample_min_max`
+     - no (min/max envelope, for display)
+     - NaN ignored within a window
+   * - :class:`LowFrequencyFilter`
+     - is itself a zero-phase low-/high-pass
+     - NaN/inf raise ``ValueError``
+   * - :func:`fft_filter`
+     - is itself a brick-wall low-/high-pass
+     - NaN/inf raise ``ValueError``
 """
 
 import numpy as np
@@ -89,6 +120,31 @@ def _decimated_nan_mask(nans, fs, fs_new, n_new):
     return out
 
 
+def _rational_ratio(fs, fs_new, n, max_term=50000):
+    """
+    ``fs_new / fs`` as a fraction ``up / down`` for polyphase resampling.
+
+    The ratio is taken from the decimal representation of the two rates (e.g.
+    32556 Hz -> 1000 Hz gives 250 / 8139 exactly). If that needs terms larger than
+    ``max_term``, the closest fraction with smaller terms is used only if the timing
+    error it causes stays below 0.01 output samples at the end of the record;
+    otherwise ``ValueError`` is raised (a silently time-stretched output is worse).
+    """
+    from fractions import Fraction
+    exact = Fraction(repr(float(fs_new))) / Fraction(repr(float(fs)))
+    if exact.numerator <= max_term and exact.denominator <= max_term:
+        return exact
+    frac = exact.limit_denominator(max_term)
+    n_out = n * fs_new / fs
+    drift = abs(float(frac) / float(exact) - 1) * n_out  # in output samples
+    if drift > 0.01:
+        raise ValueError(
+            f'decimate: cannot represent fs_new/fs = {fs_new!r}/{fs!r} as a small rational '
+            f'(best approximation {frac} would shift the last sample by {drift:.3g} samples); '
+            'round fs to a value with fewer decimals or resample in two steps')
+    return frac
+
+
 def _downsample_filtered(x, fs, fs_new, n_new):
     """
     Pick samples at times ``k / fs_new`` from an already low-passed signal
@@ -100,8 +156,7 @@ def _downsample_filtered(x, fs, fs_new, n_new):
         q = int(round(ratio))
         y = x[:, ::q]
     else:
-        from fractions import Fraction
-        frac = Fraction(fs_new / fs).limit_denominator(1000)
+        frac = _rational_ratio(fs, fs_new, x.shape[1])
         y = signal.resample_poly(x, frac.numerator, frac.denominator, axis=1, padtype='line')
     if y.shape[1] >= n_new:
         return y[:, :n_new]
@@ -125,7 +180,12 @@ def decimate(x, fs, fs_new, cutoff=None, datarate=False):
        -6 dB at ``cutoff``.
     3. Downsampling to ``n_new = round(n_samples * fs_new / fs)`` samples placed at
        ``k / fs_new`` s. Integer ratios ``fs / fs_new`` pick every ``q``-th sample
-       exactly; non-integer ratios use :func:`scipy.signal.resample_poly`.
+       exactly; non-integer ratios use :func:`scipy.signal.resample_poly` with the
+       exact rational ratio of the two rates as written in decimal (e.g. 32556 ->
+       1000 Hz uses 250/8139), so output sample ``k`` is at ``k / fs_new`` s with no
+       drift over long records. If the ratio has no small exact fraction (e.g. a rate
+       with many decimals) and the best approximation would shift the last sample by
+       more than 0.01 samples, ``ValueError`` is raised.
     4. The NaN mask is re-applied: an output sample is NaN if any input sample
        within ``+-0.5 / fs_new`` s of it was NaN. Signals that are entirely NaN
        stay entirely NaN.
@@ -697,6 +757,12 @@ class LowFrequencyFilter:
     ~3 / cutoff s), the output equals that of the cascade applied to an infinitely
     long signal.
 
+    Design choice: extensions were compared on synthetic data (scripts in the PR). On
+    1/f-like signals the mirrored extension gives the smallest edge error (zero
+    extension of the detrended signal is ~18 % worse); for a signal whose content lies
+    entirely well above ``cutoff`` (pure tones), zero extension would be ~2x better
+    (0.36 vs 0.77 uV in the example above) but only without any offset or drift.
+
     .. note:: **Changed after v2.0.0:**
        The signal used to be zero-padded by only ``2 * n_order * 2**n_decimate``
        samples (e.g. 24 ms for a 0.5 Hz filter at 8 kHz). Any offset therefore became a
@@ -848,10 +914,28 @@ def resample(x, fsamp_orig, fsamp_new):
     Resample a signal to a new sampling frequency by linear interpolation. NaN-aware.
 
     .. warning::
-       **No anti-aliasing filter is applied.** When downsampling, any content above
-       the new Nyquist frequency ``fsamp_new / 2`` aliases into the output. Low-pass
-       the signal below the new Nyquist first (e.g. use :func:`decimate`, which
-       filters and downsamples) - this is deliberately left to the caller.
+       **No anti-aliasing filter is applied - by design.** ``resample`` only
+       interpolates. When downsampling, any content above the new Nyquist frequency
+       ``fsamp_new / 2`` folds back (aliases) into the output: e.g. a 400 Hz tone
+       resampled 1000 -> 250 Hz appears as a full-amplitude 100 Hz tone. Band-limiting
+       the signal is deliberately left to the caller, who knows which band matters.
+       Before downsampling, low-pass below ``fsamp_new / 2`` (with margin), or use
+       :func:`decimate`, which filters and downsamples in one step.
+
+       .. code-block:: python
+
+           import scipy.signal as ss
+           from brainmaze_utils.signal import resample, decimate
+
+           fs, fs_new = 1000, 250
+           # option 1: your own zero-phase low-pass, then resample
+           sos = ss.butter(8, 0.8 * fs_new / 2, 'lp', fs=fs, output='sos')
+           y = resample(ss.sosfiltfilt(sos, x), fs, fs_new)  # x must be NaN-free here
+           # option 2: decimate (anti-aliasing filter included, NaN-aware)
+           y = decimate(x, fs, fs_new)
+
+       Upsampling (``fsamp_new > fsamp_orig``) does not need a filter; linear
+       interpolation slightly attenuates content close to the original Nyquist.
 
     Sample ``i`` of the input is at time ``i / fsamp_orig`` and sample ``k`` of the
     output at ``k / fsamp_new`` (both starting at 0); the output has
