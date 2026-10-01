@@ -7,19 +7,13 @@
 from io import StringIO
 import xml.etree.ElementTree as ET
 import os
+import re
 import pandas as pd
 from dateutil import tz
 from datetime import datetime
-import os
-import re
-from datetime import datetime
-import pytz
 from copy import deepcopy
-import argparse
-import xml.etree.ElementTree as ET
 
 from ._annotation_tools.XML_CyberPSG import *
-from brainmaze_utils.types import TwoWayDict
 import uuid
 
 xsi =  "http://www.w3.org/2001/XMLSchema-instance"
@@ -27,9 +21,31 @@ xmlns =  "http://tempuri.org/CyberPSG.xsd"
 ns = {"xmlns:xsi": xsi}
 
 
+_TIME_RE = re.compile(r'^\s*(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?\s*(Z|[+-]00:?00)?\s*$')
+
+
+def _parse_utc_time(s):
+    """
+    Parse a CyberPSG UTC time string ``YYYY-MM-DDTHH:MM:SS[.fffffff][Z]`` into a
+    timezone-aware (UTC) ``datetime``.
+
+    Any number of fractional-second digits is accepted; .NET writes 7 (100 ns ticks),
+    which :meth:`datetime.strptime` rejects. Digits beyond microseconds are truncated
+    (sub-microsecond precision is lost).
+    """
+    m = _TIME_RE.match(s)
+    if not m:
+        raise ValueError(f'Unrecognised CyberPSG time string: {s!r}')
+    base, frac, _ = m.groups()
+    dt = datetime.strptime(base, '%Y-%m-%dT%H:%M:%S')
+    if frac:
+        dt = dt.replace(microsecond=int(frac[:6].ljust(6, '0')))
+    return dt.replace(tzinfo=tz.tzutc())
+
+
 class CyberPSGFile:
     def __init__(self, path=None):
-        self.namespaces = TwoWayDict() # list of namespaces - key=prefix; value=uri
+        self.namespaces = {} # key=prefix; value=uri
         self.Element = None
         self.path = path
         self.strp_format = '%Y-%m-%dT%H:%M:%S.%f'
@@ -81,8 +97,9 @@ class CyberPSGFile:
 
 
     def get_annotations(self):
+        # id -> name. A plain dict: several types may share a name (e.g. two 'N2'
+        # types from different scorers); a two-way dict dropped all but one of them.
         types = self.get_annotation_types()
-        types = TwoWayDict(types)
         annotations = []
 
         for Element in self.Element:
@@ -113,8 +130,9 @@ class CyberPSGFile:
         return annotations
 
     def get_hypnogram(self):
+        # id -> name. A plain dict: several types may share a name (e.g. two 'N2'
+        # types from different scorers); a two-way dict dropped all but one of them.
         types = self.get_annotation_types()
-        types = TwoWayDict(types)
         annotations = []
 
         for Element in self.Element:
@@ -137,23 +155,9 @@ class CyberPSGFile:
                             except KeyError:
                                 annot['annotation'] = 'error_unknown'
                         if subtag == 'startTimeUtc':
-                            s = SubElement.text
-                            if '.' in s:
-                                frmt = self.strp_format
-                            else:
-                                frmt = self.strp_format.split('.')[0]
-                            utc = datetime.strptime(s, frmt)
-                            utc = utc.replace(tzinfo=tz.tzutc())
-                            annot['start'] = utc
+                            annot['start'] = _parse_utc_time(SubElement.text)
                         if subtag == 'endTimeUtc':
-                            s = SubElement.text
-                            if '.' in s:
-                                frmt = self.strp_format
-                            else:
-                                frmt = self.strp_format.split('.')[0]
-                            utc = datetime.strptime(s, frmt)
-                            utc = utc.replace(tzinfo=tz.tzutc())
-                            annot['end'] = utc
+                            annot['end'] = _parse_utc_time(SubElement.text)
                         if subtag == 'channelName': annot['channel'] = SubElement.text
                     if annot['annotation'] is None:
                         annot['annotation'] = 'error_unknown'
@@ -268,29 +272,32 @@ class CyberPSG_XML_Writter:
     def AnnotationTypeIDs(self):
         return [AnnotationType['id'][0].param for AnnotationType in self.AnnotationTypes.AnnotationType]
 
+    def _standard_uuid(self, name_string):
+        """Stable UUID for standard labels: exact name, else ``name + '_best'``."""
+        if name_string in self.standard_UUID:
+            return self.standard_UUID[name_string]
+        if name_string + '_best' in self.standard_UUID:
+            return self.standard_UUID[name_string + '_best']
+        return None
+
     def add_AnnotationType(self, name_string="", groupAssociationId=None, color='#FF6C1FBA', note="", startsWithEpoch=False, stdDurationInSec=0):
+        """
+        Add an annotation type. The type is written with exactly ``name_string`` as
+        its name (so a save/load round trip preserves labels). Standard labels
+        (``'N2'``, ``'N2_best'``, ...) get the stable UUID from ``standard_UUID``.
+        """
         if name_string.__len__() == 0:
             name_string = 'AnnotationType{0}'.format(self.AnnotationTypes.__len__())
-
-        # if name_string+'_aisc' in list(self.standard_UUID.keys()):
-        #     name_string += '_aisc'
-        if name_string+'_best' in list(self.standard_UUID.keys()):
-            name_string += '_best'
-
-        #print(name_string)
-        #print(list(self.standard_UUID.keys()))
-        #print(name_string+'_aisc' in list(self.standard_UUID.keys()))
 
         for AnnotationType in self.AnnotationTypes.AnnotationType:
             if AnnotationType.name[0].param == name_string:
                 raise KeyError("AnnotationType \"" + name_string + "\" already exists!")
 
-        AnnotationType = self.AnnotationTypes.add_child(myXML_AnnotationType)
-
-        if name_string in list(self.standard_UUID.keys()):
-            uuid_key = self.standard_UUID[name_string]
-        else:
+        uuid_key = self._standard_uuid(name_string)
+        if uuid_key is None or uuid_key in self.AnnotationTypeIDs:
             uuid_key = str(uuid.uuid4())
+
+        AnnotationType = self.AnnotationTypes.add_child(myXML_AnnotationType)
 
         #name_string = name_string + '_aisc'
         ID = AnnotationType.add_child(myXML_Id, param=uuid_key)
@@ -334,12 +341,6 @@ class CyberPSG_XML_Writter:
         return [Annotation['id'][0].param for Annotation in self.Annotations.Annotation]
 
     def add_Annotation(self, start_datetime:datetime, end_datetime:datetime, AnnotationTypeId=0, note='', type='GlobalAnnotation', channelName=''):
-        # if AnnotationTypeId + '_aisc' in list(self.standard_UUID.keys()):
-        #     AnnotationTypeId += '_aisc'
-
-        if AnnotationTypeId + '_best' in list(self.standard_UUID.keys()):
-            AnnotationTypeId += '_best'
-
         start_s = start_datetime.strftime("%Y-%m-%dT%H:%M:%S.%f")
         end_s = end_datetime.strftime("%Y-%m-%dT%H:%M:%S.%f")
 

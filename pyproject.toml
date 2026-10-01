@@ -26,11 +26,11 @@ classifiers = [
     "Intended Audience :: Science/Research",
 ]
 dependencies = [
-    "numpy",
-    "scipy",
-    "pandas",
-    "pytz",
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "pandas>=2.0",
     "python-dateutil",
+    "tqdm",
 ]
 
 [project.optional-dependencies]
@@ -38,7 +38,6 @@ test = [
     "pytest",
     "sphinx",
     "sphinx_book_theme",
-    "tqdm",
 ]
 
 [project.urls]

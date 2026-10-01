@@ -9,6 +9,14 @@ class ObjDict(dict):
     """
     Dictionary which you can access a) as a dict; b) as a struct with attributes. Can use both foo adding and deleting
     attributes resp items. Inherits from dict
+
+    Reading a missing **attribute** (``d.missing``) raises ``AttributeError`` (so
+    ``hasattr`` works). Reading a missing **item** (``d['missing']``) still creates
+    and returns an empty ``ObjDict`` (auto-vivification, e.g.
+    ``d['a']['b'] = 1``).
+
+    .. note:: **Changed after v2.0.0:**
+       Attribute reads of missing keys used to create the key as a side effect.
     """
 
     def __init__(self, VT_={}):
@@ -53,9 +61,10 @@ class ObjDict(dict):
         return self[key]
 
     def __getattr__(self, item):
-        if not item in self.__dir__():
-            self.__missing__(item)
-        return super().__getattribute__(item)
+        # only called when normal attribute lookup fails -> the key does not exist.
+        # Reading a missing attribute must not create it (it used to silently add an
+        # empty ObjDict, so typos went unnoticed and hasattr() was always True).
+        raise AttributeError(f"{type(self).__name__!s} has no attribute/key {item!r}")
 
 class TwoWayDict(dict):
     def __init__(self, d=None):

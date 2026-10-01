@@ -16,7 +16,7 @@ from copy import deepcopy
 
 from ._formats.CyberPSG import CyberPSGFile, CyberPSG_XML_Writter
 from ._formats.NSRR import NSRRSleepFile
-from ._utils import time_to_utc, create_duration, tile_annotations
+from ._utils import time_to_utc, time_to_timestamp, create_duration, tile_annotations
 
 
 
@@ -123,8 +123,12 @@ def load_CyberPSG(path, tile=None, verbose=True):
     Returns
     -------
     pandas.DataFrame or list
-        DataFrame with annotation columns (annotation, start, end, duration)
-        or list of DataFrames if multiple paths provided
+        DataFrame with annotation columns (annotation, start, end, duration, and
+        ``channel`` for channel annotations) or list of DataFrames if multiple paths
+        provided. ``start``/``end`` are timezone-aware UTC datetimes; fractional
+        seconds beyond microseconds (.NET writes 7 digits) are truncated.
+        Suffixes ``_aisc`` and ``_PiesPro`` are stripped from labels; other labels
+        (including ``*_best``) are returned exactly as stored in the file.
     """
     if isinstance(path, list):
         return _load_CyberPSG_dataset(path, tile, verbose)
@@ -141,7 +145,8 @@ def _load_CyberPSG(path, tile=None):
     df = create_duration(df)
     if not isinstance(tile, type(None)):
         if (df.duration > tile).sum() > 0:
-            df = tile_annotations(df, tile)
+            # tile_annotations works on numeric timestamps; convert, tile, convert back
+            df = time_to_utc(tile_annotations(time_to_timestamp(df), tile))
 
     for k in df.annotation.unique():
         if k[-5:] == '_aisc':
@@ -174,8 +179,11 @@ def save_CyberPSG(path, df):
 
     Notes
     -----
-    TODO: Do Tests
-    TODO: Implement annotation groups etc
+    Labels are written exactly as given, so ``load_CyberPSG(save_CyberPSG(df))``
+    returns the same labels (previously e.g. ``'N2'`` came back as ``'N2_best'``).
+    Standard sleep labels reuse the stable UUIDs of
+    ``CyberPSG_XML_Writter.standard_UUID``. Times are written in UTC with microsecond
+    precision. ``df`` is not modified.
     """
     #TODO: Do Tests
     #TODO: Implement annotation groups etc

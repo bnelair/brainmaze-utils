@@ -34,6 +34,7 @@ def get_files(path, endings=None, creation_time=False):
         endings_tuple is a tuple of any length
 
         The function returns paths to all files in folder and files in all subfolders as well.
+        macOS AppleDouble files (basename starting with ``._``) are skipped.
 
         .. code-block:: python
 
@@ -74,7 +75,9 @@ def get_files(path, endings=None, creation_time=False):
                 if dir.endswith(endings)]
 
 
-    data = [file for file in data if not '._' in file]
+    # skip macOS AppleDouble metadata files (basename starting with '._'); paths that
+    # merely contain '._' somewhere (e.g. 'sub._run/x.edf') are kept.
+    data = [file for file in data if not os.path.basename(file).startswith('._')]
     data.sort()
 
     if creation_time == False:

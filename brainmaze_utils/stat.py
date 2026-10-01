@@ -47,23 +47,95 @@ def combine_gauss_distributions(mu1, std1, N1, mu2, std2, N2):
 
 def combine_mvgauss_distributions(mu1, var1, N1, mu2, var2, N2):
     """
-    Recalculates a normal n-D distribution given two subsets of data.
+    Pooled mean and covariance of two multivariate data subsets from their summaries.
+
+    Exact for population (``ddof=0``) statistics: if ``mu_i``/``var_i`` are the mean
+    and the biased covariance (``numpy.cov(..., bias=True)``) of subset ``i``, the
+    result equals the mean and biased covariance of the concatenated data:
+
+    ``Sigma = (N1*Sigma1 + N2*Sigma2) / N + N1*N2 / N**2 * (mu2 - mu1)(mu2 - mu1)^T``
+
+    with ``N = N1 + N2``.
+
+    Parameters
+    ----------
+    mu1, mu2 : array_like
+        Means, shape ``(d,)`` or ``(1, d)``.
+    var1, var2 : array_like
+        Covariance matrices, shape ``(d, d)``.
+    N1, N2 : int or float
+        Number of samples in each subset.
+
+    Returns
+    -------
+    mu_combined : numpy.ndarray
+        Pooled mean, same shape as ``mu1``.
+    var_combined : numpy.ndarray
+        Pooled ``(d, d)`` covariance (symmetric).
+
+    .. note:: **Changed after v2.0.0:**
+       The between-group term used the element-wise square ``(mu2 - mu1)**2``
+       instead of the outer product, so off-diagonal (cross-covariance) terms were
+       wrong - e.g. +1.5 instead of the true -1.0 for groups whose means move in
+       opposite directions.
     """
-    c1 = N1 / (N1 + N2)
-    c2 = N2 / (N1 + N2)
+    mu1 = np.asarray(mu1, dtype=float)
+    mu2 = np.asarray(mu2, dtype=float)
+    var1 = np.asarray(var1, dtype=float)
+    var2 = np.asarray(var2, dtype=float)
+    N = N1 + N2
+    c1 = N1 / N
+    c2 = N2 / N
     mu_combined = (mu1 * c1) + (mu2 * c2)
-    var_combined = (N1*(var1) + N2*(var2) + N1*N2*(mu2-mu1)**2/(N1+N2)) / (N1+N2) # np.sqrt((N1*(std1**2) + N2*(std2**2) + N1*N2*(mu2-mu1)**2/(N1+N2)) / (N1+N2)) # https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf
-    for k1 in range(var_combined.shape[0]):
-        for k2 in range(k1+1, var_combined.shape[0]):
-            var_combined[k2, k1] = var_combined[k1, k2]
+    d = (mu2 - mu1).reshape(-1)
+    var_combined = c1 * var1 + c2 * var2 + (N1 * N2 / N ** 2) * np.outer(d, d)
     return mu_combined, var_combined
 
 
-def kl_divergence_nonparametric(pk, qk):
+def kl_divergence_nonparametric(pk, qk, eps=None):
     """
-    Calculates non-parametric KL-Divergence between two 1-D distributions given by 2 histograms with same bins.
-    """
-    l_ = pk / qk
-    barr = (~np.isinf(l_)) & (~np.isnan(l_))
-    return np.nansum(pk[barr] * np.log(l_[barr]))
+    KL divergence ``D(P || Q)`` between two discrete distributions (e.g. histograms
+    with identical bins), in nats.
 
+    ``pk`` and ``qk`` are normalised to sum to 1 first, so raw counts may be passed.
+    Bins with ``p == 0`` contribute 0.
+
+    Parameters
+    ----------
+    pk, qk : array_like
+        Non-negative weights/counts over the same bins.
+    eps : float, optional
+        If ``None`` (default) no smoothing is applied and the result is ``inf``
+        whenever some bin has ``p > 0`` and ``q == 0`` (P is not absolutely
+        continuous w.r.t. Q). If given, ``eps`` is added to **every** bin of both
+        distributions (after normalisation) and they are re-normalised, giving a
+        finite, smoothed estimate.
+
+    Returns
+    -------
+    float
+        ``sum(p * log(p / q))``, ``>= 0``; ``inf`` as described above.
+
+    .. note:: **Changed after v2.0.0:**
+       Bins with ``q == 0, p > 0`` were silently dropped (returning e.g. 0.0 instead
+       of inf) and the inputs were not normalised.
+    """
+    p = np.asarray(pk, dtype=float).ravel()
+    q = np.asarray(qk, dtype=float).ravel()
+    if p.shape != q.shape:
+        raise ValueError(f'pk and qk must have the same number of bins, got {p.size} and {q.size}')
+    if np.any(p < 0) or np.any(q < 0) or not np.all(np.isfinite(p)) or not np.all(np.isfinite(q)):
+        raise ValueError('pk and qk must be finite and non-negative')
+    if p.sum() <= 0 or q.sum() <= 0:
+        raise ValueError('pk and qk must have positive total mass')
+    p = p / p.sum()
+    q = q / q.sum()
+    if eps is not None:
+        if eps <= 0:
+            raise ValueError('eps must be > 0')
+        p = (p + eps) / (1 + eps * p.size)
+        q = (q + eps) / (1 + eps * q.size)
+    support = p > 0
+    if np.any(q[support] == 0):
+        return np.inf
+    return float(np.sum(p[support] * np.log(p[support] / q[support])))
