@@ -152,8 +152,10 @@ def test_validation():
         LowFrequencyFilter(fs=100, cutoff=10, n_decimate=3)  # cutoff above decimated Nyquist
     with pytest.raises(ValueError):
         LowFrequencyFilter(fs=FS, cutoff=None)
+    with pytest.raises(ValueError):
+        LowFrequencyFilter(fs=FS, cutoff=CUT, n_decimate=5, ftype='iir', max_gap_fill=-1)
     lff = LowFrequencyFilter(fs=FS, cutoff=CUT, n_decimate=5, ftype='iir')
     x = np.ones(1000)
-    x[5] = np.nan
+    x[5] = np.inf  # NaN is a gap; inf is not
     with pytest.raises(ValueError):
         lff(x)

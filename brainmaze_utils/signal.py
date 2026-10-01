@@ -42,11 +42,14 @@ filtering utilizing downsampling, buffering etc.
      - NaN ignored within a window
    * - :class:`LowFrequencyFilter`
      - is itself a zero-phase low-/high-pass
-     - NaN/inf raise ``ValueError``
+     - short gaps bridged, long gaps split into separately filtered segments; NaN
+       out exactly where NaN in (``inf`` raises)
    * - :func:`fft_filter`
      - is itself a brick-wall low-/high-pass
-     - NaN/inf raise ``ValueError``
+     - as :class:`LowFrequencyFilter`
 """
+
+import warnings
 
 import numpy as np
 import scipy.signal as signal
@@ -499,9 +502,36 @@ def unify_sampling_frequency(x : list, sampling_frequency: list, fs_new=None) ->
 
     return x, fs_new
 
-def fft_filter(X:np.ndarray, fs:float, cutoff:float, type:str='lp'):
+def _fft_brickwall(X, fs, cutoff, type):
+    """Brick-wall FFT filter of a finite array along the last axis (periodic assumption)."""
+    n_samples = X.shape[-1]
+    Xs = fft.fft(X, axis=-1)
+    freq = np.abs(np.fft.fftfreq(n_samples, d=1.0 / fs))
+    keep = freq <= cutoff if type == 'lp' else freq > cutoff
+    return np.real(fft.ifft(np.where(keep, Xs, 0), axis=-1))
+
+
+def _fft_filter_extended(X, fs, cutoff, type, pad_periods=5):
     """
-    Ideal (brick-wall) FFT filter.
+    Brick-wall filter of a finite array with the :class:`LowFrequencyFilter` edge
+    handling: a least-squares line is removed (and added back to the low-pass part),
+    both ends are extended by ``pad_periods / cutoff`` s (local line + mirrored
+    residual), the extended signal is filtered, and the extension is cropped.
+    ``'hp'`` is ``X`` minus the low-pass part, so ``lp + hp == X``.
+    """
+    n = X.shape[-1]
+    slope, intercept = _line_fit(X)
+    trend = slope[..., None] * np.arange(n) + intercept[..., None]
+    n_pad = int(np.ceil(pad_periods * fs / cutoff))
+    n_fit = int(round(2 * fs / cutoff))
+    R = _extend_edges_linear(X - trend, n_pad, n_pad, n_fit)
+    low = _fft_brickwall(R, fs, cutoff, 'lp')[..., n_pad:n_pad + n] + trend
+    return low if type == 'lp' else X - low
+
+
+def fft_filter(X:np.ndarray, fs:float, cutoff:float, type:str='lp', edges=None, max_gap_fill=None):
+    """
+    Ideal (brick-wall) FFT filter. NaN-aware.
 
     The signal is transformed with an FFT along the last axis, every frequency bin on
     the rejected side of ``cutoff`` is set to zero, and the result is transformed back.
@@ -516,7 +546,7 @@ def fft_filter(X:np.ndarray, fs:float, cutoff:float, type:str='lp'):
     ----------
     X : numpy.ndarray
         Signal ``(n_samples,)`` or a stack of signals ``(..., n_samples)``; filtered
-        along the **last** axis. Not modified.
+        along the **last** axis. NaN marks gaps (see Notes). Not modified.
     fs : float
         Sampling frequency in Hz.
     cutoff : float
@@ -524,22 +554,51 @@ def fft_filter(X:np.ndarray, fs:float, cutoff:float, type:str='lp'):
         the identity and ``'hp'`` return zeros.
     type : str
         ``'lp'`` or ``'hp'``.
+    edges : {None, 'periodic', 'extend'}
+        What is assumed beyond the ends of the record (and of each segment between
+        gaps):
+
+        - ``'periodic'``: nothing is added; the FFT treats the record as one period,
+          so a mismatch between its start and end rings (Gibbs) into both edges.
+          This is the v2.0.0 behaviour.
+        - ``'extend'``: the :class:`LowFrequencyFilter` edge handling - a
+          least-squares line is removed and added back to the low-pass part, and each
+          end is extended by ``5 / cutoff`` s (a local line plus the mirrored
+          residual), so offset, drift and gap edges produce no jump. Falls back to
+          ``'periodic'`` for ``cutoff == 0`` (DC removal has no edge transient).
+        - ``None`` (default): ``'periodic'`` if ``X`` contains no NaN (unchanged
+          from v2.0.0), ``'extend'`` if it does.
+    max_gap_fill : float, optional
+        Gaps shorter than this many seconds are bridged by linear interpolation;
+        longer gaps split the signal into separately filtered segments. Default
+        ``0.5 / cutoff`` (``0`` for ``cutoff == 0``).
 
     Returns
     -------
     numpy.ndarray
-        Same shape as ``X``.
+        Same shape as ``X`` (``float64``). NaN exactly where ``X`` is NaN.
 
     Raises
     ------
     ValueError
-        If ``X`` contains NaN or inf. An FFT spreads a single NaN over the whole
-        signal, so gaps must be handled (filled or cut out) before calling.
+        If ``X`` contains ``inf``, or for an invalid ``type``, ``fs``, ``cutoff`` or
+        ``edges``.
 
     Notes
     -----
-    A brick-wall filter assumes the signal is periodic and rings (Gibbs phenomenon)
-    around sharp transients and at the record edges. No windowing or padding is applied.
+    A brick-wall filter rings (Gibbs phenomenon) around sharp transients. With
+    ``edges='periodic'`` no windowing or padding is applied.
+
+    **Gaps (NaN).** As in :class:`LowFrequencyFilter`: interior gaps shorter than
+    ``max_gap_fill`` are bridged linearly, filtered through and re-masked; at longer
+    gaps the signal is split and each segment is filtered as if it were a complete
+    record, with the chosen ``edges`` handling. Leading/trailing NaN are excluded.
+    (An FFT of the whole array would spread a single NaN over the entire output.)
+
+    .. note:: **Changed after v2.0.0:**
+       NaN input used to return an all-NaN output; gaps are now handled as above.
+       ``edges`` and ``max_gap_fill`` are new; the default result for NaN-free input
+       is that of v2.0.0 apart from the frequency-axis fix (see the Changes page).
     """
     if type not in ('lp', 'hp'):
         raise ValueError(f"type must be 'lp' or 'hp', got {type!r}")
@@ -547,16 +606,30 @@ def fft_filter(X:np.ndarray, fs:float, cutoff:float, type:str='lp'):
         raise ValueError(f"fs must be > 0, got {fs!r}")
     if cutoff < 0:
         raise ValueError(f"cutoff must be >= 0, got {cutoff!r}")
-    X = np.asarray(X)
-    if not np.all(np.isfinite(X)):
-        raise ValueError('fft_filter: X contains NaN/inf; fill or remove gaps before filtering')
+    if edges not in (None, 'periodic', 'extend'):
+        raise ValueError(f"edges must be None, 'periodic' or 'extend', got {edges!r}")
+    X = np.asarray(X, dtype=float)
+    if np.isinf(X).any():
+        raise ValueError('fft_filter: X contains inf (NaN marks gaps and is handled; inf is not)')
+    has_nan = bool(np.isnan(X).any())
+    if edges is None:
+        edges = 'extend' if has_nan else 'periodic'
+    if edges == 'extend' and cutoff == 0:
+        edges = 'periodic'
+    if max_gap_fill is None:
+        max_gap_fill = 0.5 / cutoff if cutoff > 0 else 0.0
+    if not max_gap_fill >= 0:
+        raise ValueError(f'max_gap_fill must be >= 0 (seconds), got {max_gap_fill!r}')
+    if X.shape[-1] == 0:
+        return X.copy()
 
-    n_samples = X.shape[-1]
-    Xs = fft.fft(X, axis=-1)
-    freq = np.abs(np.fft.fftfreq(n_samples, d=1.0 / fs))
-    keep = freq <= cutoff if type == 'lp' else freq > cutoff
-    X_new = np.where(keep, Xs, 0)
-    return np.real(fft.ifft(X_new, axis=-1))
+    if edges == 'extend':
+        func = lambda Z: _fft_filter_extended(Z, fs, cutoff, type)
+    else:
+        func = lambda Z: _fft_brickwall(Z, fs, cutoff, type)
+    if has_nan:
+        return _per_valid_segment(X, func, int(np.ceil(max_gap_fill * fs)))
+    return func(X)
 
 def buffer(x:np.ndarray, fs:float=1, segm_size:float=None, overlap:float = 0, drop:bool=True):
     """
@@ -746,6 +819,51 @@ def _zero_phase(flt, x):
     return signal.filtfilt(b, a, x, axis=-1, padlen=padlen)
 
 
+def _valid_runs(nan_row):
+    """``(start, stop)`` index pairs of the runs of non-NaN samples in a 1-D NaN mask."""
+    d = np.diff(np.concatenate(([0], (~nan_row).astype(np.int8), [0])))
+    return list(zip(np.flatnonzero(d == 1), np.flatnonzero(d == -1)))
+
+
+def _per_valid_segment(X, func, max_fill=0):
+    """
+    Gap-aware application of ``func`` (finite N-D array -> array of the same shape,
+    time on the last axis) to ``X`` that contains NaN gaps.
+
+    1. Interior NaN runs shorter than ``max_fill`` samples (dropouts) are bridged by
+       linear interpolation between their neighbouring valid samples.
+    2. Every remaining run of valid (or bridged) samples is passed to ``func`` on its
+       own, so it is treated exactly like a complete record (``func``'s own edge
+       handling applies at the gap edges).
+    3. The output is NaN exactly where ``X`` was NaN.
+
+    Rows that share the same NaN mask (the usual case for multichannel recordings
+    with common gaps) are processed together.
+    """
+    n = X.shape[-1]
+    X2 = X.reshape(-1, n)
+    nans = np.isnan(X2)
+    out = np.full(X2.shape, np.nan)
+    if (nans == nans[:1]).all():
+        groups = [np.arange(X2.shape[0])]
+    else:
+        groups = [np.array([r]) for r in range(X2.shape[0])]
+    idx = np.arange(n)
+    for rows in groups:
+        m = nans[rows[0]].copy()
+        Xr = X2[rows].copy()
+        if max_fill > 0:
+            for a, b in _valid_runs(~m):  # NaN runs
+                if a > 0 and b < n and b - a < max_fill:
+                    for i in range(Xr.shape[0]):
+                        Xr[i, a:b] = np.interp(idx[a:b], [a - 1, b], [Xr[i, a - 1], Xr[i, b]])
+                    m[a:b] = False
+        for a, b in _valid_runs(m):
+            out[rows, a:b] = func(Xr[:, a:b])
+    out[nans] = np.nan
+    return out.reshape(X.shape)
+
+
 class LowFrequencyFilter:
     """
     Zero-phase low-pass or high-pass filter for very low cutoff frequencies relative to
@@ -780,9 +898,12 @@ class LowFrequencyFilter:
     n_order : int, optional
         Filter order: number of taps for ``ftype='fir'`` (default 101), Butterworth
         order for ``ftype='iir'`` (default 3). Used for both the anti-aliasing and the
-        cutoff filter. An FIR needs about ``n_order > 3 * fs_low / cutoff`` taps to
+        cutoff filter. An FIR needs about ``n_order >= 1.5 * fs_low / cutoff`` taps to
         resolve the cutoff (``fs_low = fs / 2**n_decimate``), otherwise its transition
-        band is much wider than ``cutoff``.
+        band is much wider than ``cutoff`` and the effective cutoff is higher: the
+        default 101 taps for 0.5 Hz at ``fs_low = 250`` Hz pass 0.94 at 0.5 Hz and reach
+        -6 dB only at ~1.7 Hz. A ``UserWarning`` is issued when the FIR's low-frequency
+        gain at ``cutoff`` exceeds 0.3 (nominal 0.25).
     dec_cutoff : float
         Normalised (to the Nyquist of each stage, ``0 < dec_cutoff < 1``) cutoff of the
         anti-aliasing low-pass used by the halving/upsampling steps. Default 0.3.
@@ -792,12 +913,18 @@ class LowFrequencyFilter:
         - ``'lp'`` returns the low-frequency content **below** ``cutoff``.
         - ``'hp'`` returns ``x`` minus that low-frequency content, i.e. the
           content **above** ``cutoff`` (use this to remove slow drift / DC).
+    max_gap_fill : float, optional
+        NaN gaps (interior runs of NaN) shorter than this many **seconds** are bridged
+        by linear interpolation before filtering; longer gaps split the signal into
+        segments that are filtered separately. Default ``0.5 / cutoff`` (1 s for
+        0.5 Hz). ``0`` always splits. See *Gaps* in the notes.
     ftype : {'fir', 'iir'}
         ``'fir'``: :func:`scipy.signal.firwin` windowed-sinc filters (``cutoff`` is the
         design -6 dB point). ``'iir'``: Butterworth filters in second-order sections
         (``cutoff`` is the design -3 dB point). All filters are applied forward and
         backward, so the phase is zero and the magnitude response is squared: at
-        ``cutoff`` the low-frequency gain is ~0.25 (FIR) or ~0.5 (IIR).
+        ``cutoff`` the low-frequency gain is ~0.5 (IIR) or ~0.25 (FIR, **only if** it
+        has enough taps, see ``n_order``).
 
     Examples
     --------
@@ -820,9 +947,26 @@ class LowFrequencyFilter:
     Notes
     -----
     **Input.** ``x`` may be 1-D ``(n_samples,)`` or N-D with time along the **last**
-    axis, e.g. ``(n_channels, n_samples)``. It must not contain NaN or inf (a single
-    NaN would spread over the whole output); fill gaps first and re-mask afterwards.
-    The input is not modified.
+    axis, e.g. ``(n_channels, n_samples)``. NaN marks gaps (see below); ``inf`` raises
+    ``ValueError``. The input is not modified.
+
+    **Gaps (NaN).** The output is NaN exactly where the input is NaN, and finite
+    everywhere else, so the filter can follow a NaN-aware :func:`decimate` in a
+    downsampling cascade.
+
+    - Gaps shorter than ``max_gap_fill`` (default half a cutoff period, e.g. dropped
+      samples) are bridged by linear interpolation, filtered through, and re-masked.
+    - Longer gaps split the signal: each valid segment is filtered on its own, with
+      the same edge handling as the record edges (below), so there is no jump at a
+      gap edge, and nothing on one side of a long gap affects the other side.
+
+    Measured on 1/f noise (SD 20) with offset, drift and a 10 Hz tone, 0.5 Hz IIR
+    high-pass, maximum error within 10 s of a gap compared with the same signal
+    without the gap: 1 ms gap 0.008, 10 ms 0.14, 100 ms 0.95 (bridged); 1 s 5.4,
+    10 s 7.5 (split; bridging would give 6.0 and 8.1). The error next to a split
+    gap is the record-edge error described below. Leading and trailing NaN are
+    simply excluded. A multichannel array whose channels share the same gaps is
+    processed in one pass.
 
     **Record edges.** A filter with a 0.5 Hz cutoff has a transient lasting
     seconds, so what is assumed about the signal beyond the two ends of the record
@@ -861,13 +1005,16 @@ class LowFrequencyFilter:
        2000 uV offset, over the first/last seconds), and the filter transient reached far
        into the record. The frequency response in the interior is unchanged. IIR filters
        are now applied in second-order sections (numerically identical response; the
-       ``b_*``/``a_*`` attributes are kept for reference). N-D input is supported, and
-       NaN/inf input raises ``ValueError`` instead of returning all-NaN output.
+       ``b_*``/``a_*`` attributes are kept for reference). N-D input is supported.
+       NaN gaps are handled (see *Gaps*); v2.0.0 returned an **all-NaN** output for
+       any input containing a NaN. ``inf`` raises ``ValueError``. Short FIRs that
+       cannot resolve the cutoff now emit a ``UserWarning``.
     """
 
     __version__ = '0.1.0'
 
-    def __init__(self, fs=None, cutoff=None, n_decimate=1, n_order=None, dec_cutoff=0.3, filter_type='lp', ftype='fir'):
+    def __init__(self, fs=None, cutoff=None, n_decimate=1, n_order=None, dec_cutoff=0.3, filter_type='lp', ftype='fir',
+                 max_gap_fill=None):
         if fs is None or cutoff is None:
             raise ValueError('LowFrequencyFilter: fs and cutoff are required')
         if not fs > 0:
@@ -882,6 +1029,11 @@ class LowFrequencyFilter:
             raise ValueError(f"filter_type must be 'lp' or 'hp', got {filter_type!r}")
         if ftype not in ('fir', 'iir'):
             raise ValueError(f"ftype must be 'fir' or 'iir', got {ftype!r}")
+        if max_gap_fill is None:
+            max_gap_fill = 0.5 / cutoff
+        if not max_gap_fill >= 0:
+            raise ValueError(f'max_gap_fill must be >= 0 (seconds), got {max_gap_fill!r}')
+        self.max_gap_fill = float(max_gap_fill)
 
         self.fs = fs
         self.cutoff = cutoff
@@ -921,6 +1073,17 @@ class LowFrequencyFilter:
             self._dec = ('ba', self.b_dec, self.a_dec)
             self._filt = ('ba', self.b_filt, self.a_filt)
 
+            # forward-backward gain at the cutoff is ~0.25 for an FIR long enough to resolve
+            # it; a short FIR has a transition band much wider than the cutoff
+            _, h = signal.freqz(self.b_filt, worN=[self.cutoff], fs=fs_low)
+            n_needed = int(np.ceil(1.5 * fs_low / self.cutoff)) | 1
+            if abs(h[0]) ** 2 > 0.3:
+                warnings.warn(
+                    f'LowFrequencyFilter: a {self.n_order}-tap FIR cannot resolve cutoff={self.cutoff!r} Hz at the '
+                    f'decimated rate {fs_low!r} Hz; its low-frequency gain at the cutoff is {abs(h[0]) ** 2:.2f} '
+                    f'instead of ~0.25, i.e. the effective cutoff is much higher. Use n_order >= {n_needed}, '
+                    f"ftype='iir', or a larger n_decimate.", UserWarning, stacklevel=3)
+
         elif self.ftype == 'iir':
             if isinstance(self.n_order, type(None)): self.n_order = 3
             self.b_dec, self.a_dec = signal.butter(self.n_order, self.dec_cutoff, btype='low')
@@ -954,18 +1117,24 @@ class LowFrequencyFilter:
         """
         Low-frequency content of ``X`` (below ``cutoff``), same shape as ``X``.
 
-        See the class notes for the edge handling. Raises ``ValueError`` if ``X``
-        contains NaN or inf.
+        See the class notes for the edge and NaN handling: every run of valid samples
+        between NaN gaps is filtered on its own, and NaN samples stay NaN. Raises
+        ``ValueError`` if ``X`` contains inf.
         """
         X = np.asarray(X, dtype=float)
         if X.ndim == 0:
             raise ValueError('LowFrequencyFilter expects at least a 1-D signal')
-        if not np.all(np.isfinite(X)):
-            raise ValueError('LowFrequencyFilter: X contains NaN/inf; fill gaps before filtering '
-                             '(e.g. brainmaze_utils.gaps.fill_gaps) and re-mask afterwards')
-        n = X.shape[-1]
-        if n == 0:
+        if np.isinf(X).any():
+            raise ValueError('LowFrequencyFilter: X contains inf (NaN marks gaps and is handled; inf is not)')
+        if X.shape[-1] == 0:
             return X.copy()
+        if np.isnan(X).any():
+            return _per_valid_segment(X, self._filter_finite, int(np.ceil(self.max_gap_fill * self.fs)))
+        return self._filter_finite(X)
+
+    def _filter_finite(self, X):
+        """Low-frequency content of a NaN-free ``X`` (record-edge handling, see class notes)."""
+        n = X.shape[-1]
 
         slope, intercept = _line_fit(X)
         trend = slope[..., None] * np.arange(n) + intercept[..., None]

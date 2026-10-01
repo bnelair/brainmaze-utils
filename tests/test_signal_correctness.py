@@ -180,9 +180,11 @@ def test_fft_filter_multichannel_and_nan():
     Y = fft_filter(X, 1000, 20, 'lp')
     np.testing.assert_allclose(Y[0], X[0], atol=1e-10)
     assert np.abs(Y[1]).max() < 1e-10
-    X[0, 3] = np.nan
+    X[0, 3] = np.inf
     with pytest.raises(ValueError):
         fft_filter(X, 1000, 20)
+    with pytest.raises(ValueError):
+        fft_filter(X[1], 1000, 20, edges='mirror')
 
 
 # --------------------------------------------------------------------------- buffer
