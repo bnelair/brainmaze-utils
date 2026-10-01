@@ -219,6 +219,7 @@
 <li class="toctree-l1"><a class="reference internal" href="vector.html">Vector</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gaps.html">Gaps (NaN handling)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="annotations.html">Annotations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changes.html">Changes</a></li>
 </ul>
 
     </div>
@@ -413,7 +414,40 @@
 <dl class="py function">
 <dt class="sig sig-object py" id="brainmaze_utils.stat.combine_mvgauss_distributions">
 <span class="sig-prename descclassname"><span class="pre">brainmaze_utils.stat.</span></span><span class="sig-name descname"><span class="pre">combine_mvgauss_distributions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mu1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mu2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">var2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">N2</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.stat.combine_mvgauss_distributions" title="Link to this definition">#</a></dt>
-<dd><p>Recalculates a normal n-D distribution given two subsets of data.</p>
+<dd><p>Pooled mean and covariance of two multivariate data subsets from their summaries.</p>
+<p>Exact for population (<code class="docutils literal notranslate"><span class="pre">ddof=0</span></code>) statistics: if <code class="docutils literal notranslate"><span class="pre">mu_i</span></code>/<code class="docutils literal notranslate"><span class="pre">var_i</span></code> are the mean
+and the biased covariance (<code class="docutils literal notranslate"><span class="pre">numpy.cov(...,</span> <span class="pre">bias=True)</span></code>) of subset <code class="docutils literal notranslate"><span class="pre">i</span></code>, the
+result equals the mean and biased covariance of the concatenated data:</p>
+<p><code class="docutils literal notranslate"><span class="pre">Sigma</span> <span class="pre">=</span> <span class="pre">(N1*Sigma1</span> <span class="pre">+</span> <span class="pre">N2*Sigma2)</span> <span class="pre">/</span> <span class="pre">N</span> <span class="pre">+</span> <span class="pre">N1*N2</span> <span class="pre">/</span> <span class="pre">N**2</span> <span class="pre">*</span> <span class="pre">(mu2</span> <span class="pre">-</span> <span class="pre">mu1)(mu2</span> <span class="pre">-</span> <span class="pre">mu1)^T</span></code></p>
+<p>with <code class="docutils literal notranslate"><span class="pre">N</span> <span class="pre">=</span> <span class="pre">N1</span> <span class="pre">+</span> <span class="pre">N2</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>mu1</strong> (<em>array_like</em>) – Means, shape <code class="docutils literal notranslate"><span class="pre">(d,)</span></code> or <code class="docutils literal notranslate"><span class="pre">(1,</span> <span class="pre">d)</span></code>.</p></li>
+<li><p><strong>mu2</strong> (<em>array_like</em>) – Means, shape <code class="docutils literal notranslate"><span class="pre">(d,)</span></code> or <code class="docutils literal notranslate"><span class="pre">(1,</span> <span class="pre">d)</span></code>.</p></li>
+<li><p><strong>var1</strong> (<em>array_like</em>) – Covariance matrices, shape <code class="docutils literal notranslate"><span class="pre">(d,</span> <span class="pre">d)</span></code>.</p></li>
+<li><p><strong>var2</strong> (<em>array_like</em>) – Covariance matrices, shape <code class="docutils literal notranslate"><span class="pre">(d,</span> <span class="pre">d)</span></code>.</p></li>
+<li><p><strong>N1</strong> (<em>int</em><em> or </em><em>float</em>) – Number of samples in each subset.</p></li>
+<li><p><strong>N2</strong> (<em>int</em><em> or </em><em>float</em>) – Number of samples in each subset.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><strong>mu_combined</strong> (<em>numpy.ndarray</em>) – Pooled mean, same shape as <code class="docutils literal notranslate"><span class="pre">mu1</span></code>.</p></li>
+<li><p><strong>var_combined</strong> (<em>numpy.ndarray</em>) – Pooled <code class="docutils literal notranslate"><span class="pre">(d,</span> <span class="pre">d)</span></code> covariance (symmetric).</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Changed after v2.0.0:</strong>
+The between-group term used the element-wise square <code class="docutils literal notranslate"><span class="pre">(mu2</span> <span class="pre">-</span> <span class="pre">mu1)**2</span></code>
+instead of the outer product, so off-diagonal (cross-covariance) terms were
+wrong - e.g. +1.5 instead of the true -1.0 for groups whose means move in
+opposite directions.</p>
+</div>
 </dd></dl>
 
 <dl class="py function">
@@ -433,8 +467,52 @@
 
 <dl class="py function">
 <dt class="sig sig-object py" id="brainmaze_utils.stat.kl_divergence_nonparametric">
-<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.stat.</span></span><span class="sig-name descname"><span class="pre">kl_divergence_nonparametric</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pk</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qk</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.stat.kl_divergence_nonparametric" title="Link to this definition">#</a></dt>
-<dd><p>Calculates non-parametric KL-Divergence between two 1-D distributions given by 2 histograms with same bins.</p>
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.stat.</span></span><span class="sig-name descname"><span class="pre">kl_divergence_nonparametric</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pk</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">qk</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eps</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.stat.kl_divergence_nonparametric" title="Link to this definition">#</a></dt>
+<dd><p>KL divergence <code class="docutils literal notranslate"><span class="pre">D(P</span> <span class="pre">||</span> <span class="pre">Q)</span></code> between discrete distributions (e.g. histograms with
+identical bins), in nats.</p>
+<p>The <strong>last axis</strong> holds the bins. A 1-D input is one distribution; an N-D input
+is a stack of distributions (e.g. <code class="docutils literal notranslate"><span class="pre">(n_features,</span> <span class="pre">n_bins)</span></code>, one histogram per
+row), and the result is the <strong>sum of the per-row divergences</strong> (as in v2.0.0).
+Each distribution is normalised to sum to 1 along the last axis first, so raw
+counts may be passed. Bins with <code class="docutils literal notranslate"><span class="pre">p</span> <span class="pre">==</span> <span class="pre">0</span></code> contribute 0.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pk</strong> (<em>array_like</em>) – Non-negative, finite weights/counts with the same shape, bins on the last
+axis. Every distribution (row) must have positive total mass.</p></li>
+<li><p><strong>qk</strong> (<em>array_like</em>) – Non-negative, finite weights/counts with the same shape, bins on the last
+axis. Every distribution (row) must have positive total mass.</p></li>
+<li><p><strong>eps</strong> (<em>float</em><em>, </em><em>optional</em>) – If <code class="docutils literal notranslate"><span class="pre">None</span></code> (default) no smoothing is applied and the result is <code class="docutils literal notranslate"><span class="pre">inf</span></code>
+whenever some bin has <code class="docutils literal notranslate"><span class="pre">p</span> <span class="pre">&gt;</span> <span class="pre">0</span></code> and <code class="docutils literal notranslate"><span class="pre">q</span> <span class="pre">==</span> <span class="pre">0</span></code> (P is not absolutely
+continuous w.r.t. Q). If given (finite, <code class="docutils literal notranslate"><span class="pre">&gt;</span> <span class="pre">0</span></code>), <code class="docutils literal notranslate"><span class="pre">eps</span></code> is added to <strong>every</strong>
+bin of both distributions (after normalisation) and they are re-normalised,
+giving a finite, smoothed estimate.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">sum(p</span> <span class="pre">*</span> <span class="pre">log(p</span> <span class="pre">/</span> <span class="pre">q))</span></code> over all bins (and rows), <code class="docutils literal notranslate"><span class="pre">&gt;=</span> <span class="pre">0</span></code>; <code class="docutils literal notranslate"><span class="pre">inf</span></code> as
+described above.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the shapes differ, any value is negative or not finite, a distribution
+    has zero total mass, or <code class="docutils literal notranslate"><span class="pre">eps</span></code> is not a finite positive number.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Changed after v2.0.0:</strong>
+Bins with <code class="docutils literal notranslate"><span class="pre">q</span> <span class="pre">==</span> <span class="pre">0,</span> <span class="pre">p</span> <span class="pre">&gt;</span> <span class="pre">0</span></code> were silently dropped (returning e.g. 0.0 instead
+of inf). Inputs were not normalised: for already normalised histograms the
+result is unchanged (also for 2-D stacks of normalised rows, which is how
+brainmaze-eeg calls it), but <strong>raw counts now give the KL divergence of the
+normalised histograms</strong> instead of <code class="docutils literal notranslate"><span class="pre">sum(c_p</span> <span class="pre">*</span> <span class="pre">log(c_p</span> <span class="pre">/</span> <span class="pre">c_q))</span></code>, which
+scaled with the number of samples and was not a divergence. Invalid input
+(negative, NaN/inf, zero mass, different shapes) now raises <code class="docutils literal notranslate"><span class="pre">ValueError</span></code>.</p>
+</div>
 </dd></dl>
 
 </section>

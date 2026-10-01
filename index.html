@@ -220,6 +220,7 @@
 <li class="toctree-l1"><a class="reference internal" href="vector.html">Vector</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gaps.html">Gaps (NaN handling)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="annotations.html">Annotations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changes.html">Changes</a></li>
 </ul>
 
     </div>
@@ -390,6 +391,7 @@
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze-brain-electrophysiology-behavior-and-dynamics-analysis-toolbox-utils">BrainMaze: Brain Electrophysiology, Behavior and Dynamics Analysis Toolbox - Utils</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#documentation">Documentation</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#installation">Installation</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#signal-processing-conventions">Signal-processing conventions</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-to-contribute">How to contribute</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#releasing">Releasing</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#building-documentation">Building Documentation</a></li>
@@ -426,6 +428,47 @@
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>brainmaze-utils
 </pre></div>
 </div>
+<p>Supported dependency versions: NumPy 1.24+ (1.x and 2.x), SciPy 1.10+, pandas 2.x and 3.x.</p>
+</section>
+<section id="signal-processing-conventions">
+<h2>Signal-processing conventions<a class="headerlink" href="#signal-processing-conventions" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>Multichannel arrays are <code class="docutils literal notranslate"><span class="pre">(n_channels,</span> <span class="pre">n_samples)</span></code>: time runs along the <strong>last</strong> axis.
+Frequencies are in Hz, durations in seconds. Functions return new arrays and do not modify
+their inputs.</p></li>
+<li><p>NaN marks missing data. Every function documents what it does with NaN; resampling functions
+re-apply the gaps to their output instead of silently filling them.</p></li>
+<li><p><strong>Which functions filter?</strong></p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">signal.decimate</span></code>: anti-aliasing low-pass included (16th-order Butterworth in second-order
+sections, zero-phase, default cutoff <code class="docutils literal notranslate"><span class="pre">fs_new</span> <span class="pre">/</span> <span class="pre">3</span></code>), then resampling to exactly <code class="docutils literal notranslate"><span class="pre">k</span> <span class="pre">/</span> <span class="pre">fs_new</span></code>
+(any ratio, including non-round rates such as 30000.5 Hz; it also upsamples). Use this to
+change the sampling rate.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">signal.resample</span></code>: <strong>no anti-aliasing filter, by design.</strong> It only interpolates. When
+downsampling, low-pass the signal below the new Nyquist frequency first, or use <code class="docutils literal notranslate"><span class="pre">decimate</span></code>.
+Otherwise content above <code class="docutils literal notranslate"><span class="pre">fs_new</span> <span class="pre">/</span> <span class="pre">2</span></code> aliases into the output.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">signal.nandecimate</span></code>: weak 30-tap FIR anti-aliasing (legacy); prefer <code class="docutils literal notranslate"><span class="pre">decimate</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">signal.LowFrequencyFilter</span></code>: zero-phase low-/high-pass for very low cutoffs (e.g. a 0.5 Hz
+high-pass on 8 kHz data) via a decimate/filter/upsample cascade. DC offset and linear drift
+are handled exactly at the record edges, so there are no start/end jumps. NaN gaps are
+handled (short ones bridged, long ones split into segments with the same edge handling);
+the output is NaN exactly where the input is, so it can follow <code class="docutils literal notranslate"><span class="pre">decimate</span></code> in a cascade.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">signal.fft_filter</span></code>: brick-wall FFT filter (rings at transients; record edges periodic by
+default, <code class="docutils literal notranslate"><span class="pre">edges='extend'</span></code> for the edge handling above). NaN gaps handled as above.</p></li>
+</ul>
+</li>
+</ul>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">scipy.signal</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ss</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">brainmaze_utils.signal</span><span class="w"> </span><span class="kn">import</span> <span class="n">decimate</span><span class="p">,</span> <span class="n">resample</span>
+
+<span class="n">y</span> <span class="o">=</span> <span class="n">decimate</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">fs</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="n">fs_new</span><span class="o">=</span><span class="mi">250</span><span class="p">)</span>               <span class="c1"># filtered + downsampled, NaN-aware</span>
+
+<span class="n">sos</span> <span class="o">=</span> <span class="n">ss</span><span class="o">.</span><span class="n">butter</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="s1">'lp'</span><span class="p">,</span> <span class="n">fs</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s1">'sos'</span><span class="p">)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">resample</span><span class="p">(</span><span class="n">ss</span><span class="o">.</span><span class="n">sosfiltfilt</span><span class="p">(</span><span class="n">sos</span><span class="p">,</span> <span class="n">x</span><span class="p">),</span> <span class="mi">2000</span><span class="p">,</span> <span class="mi">250</span><span class="p">)</span>    <span class="c1"># resample: you low-pass first</span>
+</pre></div>
+</div>
+<p>See the <em>Changes</em> page of the documentation for behaviour changes after v2.0.0 (bug fixes
+that change numerical results).</p>
 </section>
 <section id="how-to-contribute">
 <h2>How to contribute<a class="headerlink" href="#how-to-contribute" title="Link to this heading">#</a></h2>
@@ -495,6 +538,7 @@ We appreciate you citing these papers when utilizing this toolbox in further res
 <li class="toctree-l1"><a class="reference internal" href="vector.html">Vector</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gaps.html">Gaps (NaN handling)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="annotations.html">Annotations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changes.html">Changes</a></li>
 </ul>
 </div>
 </section>
@@ -541,6 +585,7 @@ We appreciate you citing these papers when utilizing this toolbox in further res
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze-brain-electrophysiology-behavior-and-dynamics-analysis-toolbox-utils">BrainMaze: Brain Electrophysiology, Behavior and Dynamics Analysis Toolbox - Utils</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#documentation">Documentation</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#installation">Installation</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#signal-processing-conventions">Signal-processing conventions</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#how-to-contribute">How to contribute</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#releasing">Releasing</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#building-documentation">Building Documentation</a></li>

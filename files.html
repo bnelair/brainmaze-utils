@@ -219,6 +219,7 @@
 <li class="toctree-l1"><a class="reference internal" href="vector.html">Vector</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gaps.html">Gaps (NaN handling)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="annotations.html">Annotations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changes.html">Changes</a></li>
 </ul>
 
     </div>
@@ -417,7 +418,8 @@
 <p>For each file in path directory and subdirectories with endings from endings_tuple returns path in a list variable</p>
 <p>path is a string, the path to the directory where you wanna search specific files.</p>
 <p>endings_tuple is a tuple of any length</p>
-<p>The function returns paths to all files in folder and files in all subfolders as well.</p>
+<p>The function returns paths to all files in folder and files in all subfolders as well.
+macOS AppleDouble files (basename starting with <code class="docutils literal notranslate"><span class="pre">._</span></code>) are skipped.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">best.files</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_files</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 

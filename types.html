@@ -219,6 +219,7 @@
 <li class="toctree-l1"><a class="reference internal" href="vector.html">Vector</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gaps.html">Gaps (NaN handling)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="annotations.html">Annotations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changes.html">Changes</a></li>
 </ul>
 
     </div>
@@ -421,6 +422,25 @@
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">brainmaze_utils.types.</span></span><span class="sig-name descname"><span class="pre">ObjDict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">VT_</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.types.ObjDict" title="Link to this definition">#</a></dt>
 <dd><p>Dictionary which you can access a) as a dict; b) as a struct with attributes. Can use both foo adding and deleting
 attributes resp items. Inherits from dict</p>
+<p>Missing keys are created on access (auto-vivification), both as items and as
+attributes, so nested structures can be built directly:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">d</span> <span class="o">=</span> <span class="n">ObjDict</span><span class="p">()</span>
+<span class="n">d</span><span class="o">.</span><span class="n">cfg</span><span class="o">.</span><span class="n">sub</span> <span class="o">=</span> <span class="mi">3</span>          <span class="c1"># {'cfg': {'sub': 3}}</span>
+<span class="n">d</span><span class="p">[</span><span class="s1">'a'</span><span class="p">][</span><span class="s1">'b'</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>        <span class="c1"># {'cfg': ..., 'a': {'b': 1}}</span>
+</pre></div>
+</div>
+<p>A consequence (unchanged from v2.0.0): reading a missing public attribute
+creates it as an empty <code class="docutils literal notranslate"><span class="pre">ObjDict</span></code>, so <code class="docutils literal notranslate"><span class="pre">hasattr(d,</span> <span class="pre">'x')</span></code> is always <code class="docutils literal notranslate"><span class="pre">True</span></code> for
+public names and creates <code class="docutils literal notranslate"><span class="pre">'x'</span></code>; test membership with <code class="docutils literal notranslate"><span class="pre">'x'</span> <span class="pre">in</span> <span class="pre">d</span></code> instead.</p>
+<p>Names starting with an underscore (including dunders such as <code class="docutils literal notranslate"><span class="pre">__deepcopy__</span></code>)
+are never auto-created; reading a missing one raises <code class="docutils literal notranslate"><span class="pre">AttributeError</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Changed after v2.0.0:</strong>
+Dunder lookups used to auto-create keys too, so <code class="xref py py-func docutils literal notranslate"><span class="pre">copy.deepcopy()</span></code>, <code class="docutils literal notranslate"><span class="pre">copy</span></code>
+and <code class="docutils literal notranslate"><span class="pre">pickle</span></code> of an <code class="docutils literal notranslate"><span class="pre">ObjDict</span></code> failed (<code class="docutils literal notranslate"><span class="pre">'ObjDict'</span> <span class="pre">object</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">callable</span></code>)
+and protocol probes (<code class="docutils literal notranslate"><span class="pre">__array__</span></code>, <code class="docutils literal notranslate"><span class="pre">_repr_html_</span></code>, …) added junk keys.</p>
+</div>
 </dd></dl>
 
 <dl class="py function">

@@ -1,0 +1,806 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Changes &#8212; BrainMaze: A Toolbox to Analyze Brain Electrophysiology, Behavior and Dynamics - Utils</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=90905a2f556bf617f1a9" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=90905a2f556bf617f1a9" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=4418a689" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="_static/scripts/fontawesome.js?digest=90905a2f556bf617f1a9"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=90905a2f556bf617f1a9" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=90905a2f556bf617f1a9" />
+
+    <script src="_static/documentation_options.js?v=ce394494"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=fab101a9"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'changes';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <link rel="icon" href="_static/brainmaze_173x173.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Annotations" href="annotations.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="2.0.0" />
+  
+    
+    <script src="_static/searchtools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script src="searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/brainmaze_1757x1762.png" class="logo__image only-light" alt="BrainMaze: A Toolbox to Analyze Brain Electrophysiology, Behavior and Dynamics - Utils - Home"/>
+    <img src="_static/brainmaze_1757x1762.png" class="logo__image only-dark pst-js-only" alt="BrainMaze: A Toolbox to Analyze Brain Electrophysiology, Behavior and Dynamics - Utils - Home"/>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="index.html">
+                    BrainMaze - Utils
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">BrainMaze - Python Packages</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="brainmaze_ext.html">BrainMaze</a></li>
+<li class="toctree-l1"><a class="reference internal" href="brainmaze_eeg_ext.html">BrainMaze - EEG</a></li>
+<li class="toctree-l1"><a class="reference internal" href="brainmaze_utils_ext.html">BrainMaze - Utils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="brainmaze_zmq_ext.html">BrainMaze - ZMQ</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">BrainMaze Utils - Modules</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="files.html">Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="signal.html">Signal</a></li>
+<li class="toctree-l1"><a class="reference internal" href="stat.html">Stats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="types.html">Types</a></li>
+<li class="toctree-l1"><a class="reference internal" href="vector.html">Vector</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gaps.html">Gaps (NaN handling)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="annotations.html">Annotations</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Changes</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+<a href="https://github.com/bnelair/brainmaze_utils" target="_blank"
+   class="btn btn-sm btn-source-repository-button"
+   title="Source repository"
+   data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+
+</a>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="_sources/changes.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button pst-navbar-icon"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div>
+
+
+<button class="btn btn-sm pst-navbar-icon search-button search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+</button>
+<button class="sidebar-toggle secondary-toggle btn btn-sm pst-navbar-icon" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Changes</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased-after-v2-0-0-correctness-fixes">Unreleased (after v2.0.0): correctness fixes</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#new-exceptions-and-warnings">New exceptions and warnings</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#signal-brainmaze-utils-signal">Signal (<code class="xref py py-mod docutils literal notranslate"><span class="pre">brainmaze_utils.signal</span></code>)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#statistics-brainmaze-utils-stat">Statistics (<code class="xref py py-mod docutils literal notranslate"><span class="pre">brainmaze_utils.stat</span></code>)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#annotations-brainmaze-utils-annotations">Annotations (<code class="xref py py-mod docutils literal notranslate"><span class="pre">brainmaze_utils.annotations</span></code>)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#other">Other</a></li>
+</ul>
+</li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="changes">
+<h1>Changes<a class="headerlink" href="#changes" title="Link to this heading">#</a></h1>
+<section id="unreleased-after-v2-0-0-correctness-fixes">
+<h2>Unreleased (after v2.0.0): correctness fixes<a class="headerlink" href="#unreleased-after-v2-0-0-correctness-fixes" title="Link to this heading">#</a></h2>
+<p>These are bug fixes, but several of them <strong>change numerical results</strong>, and some calls that used
+to return (often wrong) results now raise. If you compare with results computed by v2.0.0 or
+earlier, or upgrade a pipeline, check the items below. Every behaviour change is listed; the
+first table collects every new exception and warning.</p>
+<section id="new-exceptions-and-warnings">
+<h3>New exceptions and warnings<a class="headerlink" href="#new-exceptions-and-warnings" title="Link to this heading">#</a></h3>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 45.0%" />
+<col style="width: 25.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Function</p></th>
+<th class="head"><p>Raises when</p></th>
+<th class="head"><p>v2.0.0 did</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">signal.decimate</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ValueError</span></code>: <code class="docutils literal notranslate"><span class="pre">fs</span> <span class="pre">&lt;=</span> <span class="pre">0</span></code> or <code class="docutils literal notranslate"><span class="pre">fs_new</span> <span class="pre">&lt;=</span> <span class="pre">0</span></code>; <code class="docutils literal notranslate"><span class="pre">cutoff</span> <span class="pre">&lt;=</span> <span class="pre">0</span></code>; <code class="docutils literal notranslate"><span class="pre">cutoff</span> <span class="pre">&gt;=</span> <span class="pre">fs_new</span> <span class="pre">/</span> <span class="pre">2</span></code>
+when downsampling (would alias); <code class="docutils literal notranslate"><span class="pre">x</span></code> with more than 2 dimensions</p></td>
+<td><p>aliased silently for a high <code class="docutils literal notranslate"><span class="pre">cutoff</span></code>; crashed or returned garbage otherwise</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">signal.resample</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ValueError</span></code>: a sampling frequency <code class="docutils literal notranslate"><span class="pre">&lt;=</span> <span class="pre">0</span></code></p></td>
+<td><p>divided by zero / returned garbage</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">signal.LowFrequencyFilter</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ValueError</span></code> at construction: <code class="docutils literal notranslate"><span class="pre">fs</span></code> or <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> missing or <code class="docutils literal notranslate"><span class="pre">&lt;=</span> <span class="pre">0</span></code>; <code class="docutils literal notranslate"><span class="pre">n_decimate</span></code> not
+an integer <code class="docutils literal notranslate"><span class="pre">&gt;=</span> <span class="pre">0</span></code>; <code class="docutils literal notranslate"><span class="pre">dec_cutoff</span></code> outside <code class="docutils literal notranslate"><span class="pre">(0,</span> <span class="pre">1)</span></code>; <code class="docutils literal notranslate"><span class="pre">filter_type</span></code> not <code class="docutils literal notranslate"><span class="pre">'lp'/'hp'</span></code>;
+<code class="docutils literal notranslate"><span class="pre">ftype</span></code> not <code class="docutils literal notranslate"><span class="pre">'fir'/'iir'</span></code>; <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> above the decimated Nyquist frequency;
+<code class="docutils literal notranslate"><span class="pre">max_gap_fill</span> <span class="pre">&lt;</span> <span class="pre">0</span></code>. <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> when filtering: input contains <code class="docutils literal notranslate"><span class="pre">inf</span></code> or is 0-D.
+<strong>UserWarning</strong> at construction: the FIR is too short to resolve <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> (low-frequency
+gain at <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> above 0.3 instead of ~0.25), e.g. the default 101 taps for 0.5 Hz at
+<code class="docutils literal notranslate"><span class="pre">fs</span> <span class="pre">/</span> <span class="pre">2**n_decimate</span> <span class="pre">=</span> <span class="pre">250</span></code> Hz</p></td>
+<td><p>no validation: an invalid <code class="docutils literal notranslate"><span class="pre">filter_type</span></code> returned <code class="docutils literal notranslate"><span class="pre">None</span></code>, an invalid <code class="docutils literal notranslate"><span class="pre">ftype</span></code> failed
+later with <code class="docutils literal notranslate"><span class="pre">AttributeError</span></code>, a too-high cutoff failed in the filter design; <code class="docutils literal notranslate"><span class="pre">inf</span></code> gave
+an all-NaN output</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">signal.fft_filter</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ValueError</span></code>: <code class="docutils literal notranslate"><span class="pre">type</span></code> not <code class="docutils literal notranslate"><span class="pre">'lp'/'hp'</span></code>, <code class="docutils literal notranslate"><span class="pre">fs</span> <span class="pre">&lt;=</span> <span class="pre">0</span></code>, <code class="docutils literal notranslate"><span class="pre">cutoff</span> <span class="pre">&lt;</span> <span class="pre">0</span></code>, invalid <code class="docutils literal notranslate"><span class="pre">edges</span></code>,
+<code class="docutils literal notranslate"><span class="pre">max_gap_fill</span> <span class="pre">&lt;</span> <span class="pre">0</span></code>, input contains <code class="docutils literal notranslate"><span class="pre">inf</span></code></p></td>
+<td><p>wrong or all-NaN output</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">signal.buffer</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ValueError</span></code>: <code class="docutils literal notranslate"><span class="pre">overlap</span> <span class="pre">&lt;</span> <span class="pre">0</span></code> or <code class="docutils literal notranslate"><span class="pre">overlap</span> <span class="pre">&gt;=</span> <span class="pre">segm_size</span></code>; <code class="docutils literal notranslate"><span class="pre">segm_size</span> <span class="pre">&lt;=</span> <span class="pre">0</span></code>; segment or hop
+shorter than one sample; <code class="docutils literal notranslate"><span class="pre">x</span></code> not 1-D</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">overlap</span> <span class="pre">&gt;=</span> <span class="pre">segm_size</span></code> <strong>hung forever</strong>; 2-D input was buffered along the channel axis</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">signal.detrend</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ValueError</span></code>: fewer than two finite samples (<code class="docutils literal notranslate"><span class="pre">'lstsq'</span></code>); unknown <code class="docutils literal notranslate"><span class="pre">method</span></code></p></td>
+<td><p>n/a (endpoint line only)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">stat.kl_divergence_nonparametric</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ValueError</span></code>: shapes differ; negative, NaN or inf values; a distribution (row) with zero
+mass; <code class="docutils literal notranslate"><span class="pre">eps</span></code> not a finite number <code class="docutils literal notranslate"><span class="pre">&gt;</span> <span class="pre">0</span></code></p></td>
+<td><p>returned a number (invalid bins dropped)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">annotations.create_day_indexes</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ValueError</span></code>: <code class="docutils literal notranslate"><span class="pre">start</span></code> holds timezone-naive datetimes</p></td>
+<td><p>accepted naive datetimes</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">annotations.load_NSRR</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">KeyError</span></code> listing <strong>all</strong> unmapped <code class="docutils literal notranslate"><span class="pre">EventConcept</span></code> values</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">KeyError</span></code> on the first unmapped one (and on every Stage 3 epoch, see below)</p></td>
+</tr>
+<tr class="row-odd"><td><p>CyberPSG loader</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ValueError</span></code> for an unparseable time string (message names the string)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">ValueError</span></code> from <code class="docutils literal notranslate"><span class="pre">strptime</span></code>, also for valid 7-digit (.NET) fractions</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">types.ObjDict</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">AttributeError</span></code> when reading a missing attribute whose name starts with <code class="docutils literal notranslate"><span class="pre">_</span></code></p></td>
+<td><p>created the key, which broke <code class="docutils literal notranslate"><span class="pre">copy</span></code>/<code class="docutils literal notranslate"><span class="pre">deepcopy</span></code>/<code class="docutils literal notranslate"><span class="pre">pickle</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<section id="signal-brainmaze-utils-signal">
+<h3>Signal (<a class="reference internal" href="signal.html#module-brainmaze_utils.signal" title="brainmaze_utils.signal"><code class="xref py py-mod docutils literal notranslate"><span class="pre">brainmaze_utils.signal</span></code></a>)<a class="headerlink" href="#signal-brainmaze-utils-signal" title="Link to this heading">#</a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">decimate</span></code>:</p>
+<ul>
+<li><p>The 16th-order Butterworth filter was designed in <code class="docutils literal notranslate"><span class="pre">(b,</span> <span class="pre">a)</span></code> form and became unstable for
+ratios <code class="docutils literal notranslate"><span class="pre">fs</span> <span class="pre">/</span> <span class="pre">fs_new</span> <span class="pre">&gt;=</span> <span class="pre">~10</span></code>. The output was then <strong>entirely NaN, with no error</strong> (e.g.
+3000-&gt;250, 4000-&gt;250, 1000-&gt;50, 32000-&gt;1000 Hz) or overflowed. It now uses second-order
+sections.</p></li>
+<li><p>The final resampling step no longer uses the FFT (<code class="docutils literal notranslate"><span class="pre">scipy.signal.resample</span></code>, which treats the
+record as periodic and wraps its end into its start). Integer ratios pick every q-th filtered
+sample (exact). <strong>Every other ratio</strong>, including rates with decimals (30000.5, 511.9999,
+24414.0625 Hz) and upsampling, evaluates the filtered signal at exactly <code class="docutils literal notranslate"><span class="pre">k</span> <span class="pre">/</span> <span class="pre">fs_new</span></code> with a
+Kaiser-windowed sinc interpolator (120 dB design): no timing drift however long the record,
+and ~1e-7 interpolation error for in-band content (measured on a 7 Hz tone: 32556-&gt;1000 Hz
+1.2e-8, 30000-&gt;256 Hz 1.2e-8, 499.907-&gt;200 Hz 8e-7; 511.9999-&gt;256 Hz over 8 h ends within
+5e-8 of the analytic tone). Results therefore differ from v2.0.0 slightly everywhere and
+noticeably near the record edges, where v2.0.0’s FFT wrap-around was wrong.</p></li>
+<li><p>Upsampling (<code class="docutils literal notranslate"><span class="pre">fs_new</span> <span class="pre">&gt;</span> <span class="pre">fs</span></code>) works for any ratio. v2.0.0 upsampled only for ratios below 1.5
+(and returned NaN between ~1.45 and 1.5). With the default cutoff <code class="docutils literal notranslate"><span class="pre">fs_new</span> <span class="pre">/</span> <span class="pre">3</span></code> the
+Butterworth is still applied when it lies below <code class="docutils literal notranslate"><span class="pre">0.45</span> <span class="pre">*</span> <span class="pre">fs</span></code> (ratios below ~1.35, e.g.
+150-&gt;200 Hz, as in v2.0.0) and skipped otherwise; the interpolator keeps content up to
+<code class="docutils literal notranslate"><span class="pre">0.45</span> <span class="pre">*</span> <span class="pre">fs</span></code>. Accuracy 150-&gt;200 Hz: 4e-7 (v2.0.0: 7e-5). When upsampling, the last output
+sample can lie up to one input period after the last input sample (up to 3 output samples,
+e.g. 250-&gt;1000 Hz); these are extrapolated and their error on a unit tone is 0.1 (20 Hz) to ~1
+(near <code class="docutils literal notranslate"><span class="pre">0.4</span> <span class="pre">*</span> <span class="pre">fs</span></code>). When the Butterworth is skipped, content between <code class="docutils literal notranslate"><span class="pre">0.45</span> <span class="pre">*</span> <span class="pre">fs</span></code> and
+<code class="docutils literal notranslate"><span class="pre">fs</span> <span class="pre">/</span> <span class="pre">2</span></code> leaves an image (~7 % at <code class="docutils literal notranslate"><span class="pre">0.48</span> <span class="pre">*</span> <span class="pre">fs</span></code>).</p></li>
+<li><p>A user <code class="docutils literal notranslate"><span class="pre">cutoff</span> <span class="pre">&gt;=</span> <span class="pre">fs_new</span> <span class="pre">/</span> <span class="pre">2</span></code> raises when downsampling. v2.0.0 accepted it and let content
+above the new Nyquist frequency alias (70 Hz passed at full amplitude for 1000-&gt;100 Hz with
+<code class="docutils literal notranslate"><span class="pre">cutoff=80</span></code>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fs_new</span> <span class="pre">==</span> <span class="pre">fs</span></code> low-pass filters at <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> as in v2.0.0.</p></li>
+<li><p>NaN gaps are interpolated for filtering and then <strong>re-applied</strong> to the output: an output
+sample is NaN if any input sample within <code class="docutils literal notranslate"><span class="pre">+-0.5</span> <span class="pre">/</span> <span class="pre">fs_new</span></code> of it, or one of the two input
+samples bracketing it, was NaN. Before, gaps were silently filled with the channel mean and
+returned as data.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">datarate=True</span></code> works for 1-D and multichannel input. Empty input returns an empty array.</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">nandecimate</span></code>: NaNs were filled with the NaN <em>fraction</em> (0-1) instead of the channel mean. Next
+to every gap this caused errors of the order of the DC offset (47 uV for a 100 uV offset). The
+output NaN mask uses the same window rule as <code class="docutils literal notranslate"><span class="pre">decimate</span></code> (it used to threshold a resampled mask
+at 0.5).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">unify_sampling_frequency</span></code>: uses <code class="docutils literal notranslate"><span class="pre">decimate</span></code>, so everything above applies; in particular
+channels below <code class="docutils literal notranslate"><span class="pre">fs_new</span></code> are upsampled for any ratio (brainmaze-eeg calls it with
+<code class="docutils literal notranslate"><span class="pre">fs_new=200</span></code>). It no longer replaces the arrays in the caller’s list.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">resample</span></code>:</p>
+<ul>
+<li><p>Crashed on NumPy 2 (<code class="docutils literal notranslate"><span class="pre">np.NaN</span></code>) and divided by zero for constant signals.</p></li>
+<li><p>The time axes pinned both endpoints, so the effective output rate was
+<code class="docutils literal notranslate"><span class="pre">(N_new</span> <span class="pre">-</span> <span class="pre">1)</span> <span class="pre">/</span> <span class="pre">(N</span> <span class="pre">-</span> <span class="pre">1)</span> <span class="pre">*</span> <span class="pre">fs</span></code> (1000-&gt;300 Hz: 299.3 Hz). Output sample <code class="docutils literal notranslate"><span class="pre">k</span></code> is now exactly at
+<code class="docutils literal notranslate"><span class="pre">k</span> <span class="pre">/</span> <span class="pre">fs_new</span></code>.</p></li>
+<li><p>It still applies <strong>no anti-aliasing filter, by design</strong>; this is now documented prominently.</p></li>
+<li><p>NaN: an output sample is NaN if one of its two bracketing input samples is NaN. When
+downsampling, a gap that falls entirely between two output instants marks nothing (a
+3-sample gap at 1000-&gt;250 Hz gives no NaN); use <code class="docutils literal notranslate"><span class="pre">decimate</span></code> to keep gap masks.</p></li>
+<li><p>Empty input returns an empty array (it raised a reshape error).</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">LowFrequencyFilter</span></code>:</p>
+<ul>
+<li><p>Removed the large jumps at the start and end of the output. Root causes: zero padding turned
+any DC offset into a step, and the padding was only <code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">*</span> <span class="pre">n_order</span> <span class="pre">*</span> <span class="pre">2**n_decimate</span></code> samples
+(24 ms for a 0.5 Hz filter at 8 kHz) instead of several cutoff periods. Now a least-squares
+line (offset and drift) is removed and added back, and each edge is extended by <code class="docutils literal notranslate"><span class="pre">3</span> <span class="pre">/</span> <span class="pre">cutoff</span></code>
+seconds: a local line is extrapolated and the residual is mirrored about it. Example: 8 kHz,
+0.5 Hz high-pass, 2000 uV offset with 40 uV/s drift: the edge error fell from ~1000-1400 uV to
+~0.7 uV, the same as for the signal without offset and drift. The interior frequency response
+is unchanged.</p></li>
+<li><p><strong>NaN gaps are handled</strong> (v2.0.0 returned an all-NaN output for any input containing a NaN).
+The output is NaN exactly where the input is NaN. Interior gaps shorter than <code class="docutils literal notranslate"><span class="pre">max_gap_fill</span></code>
+(new parameter, default <code class="docutils literal notranslate"><span class="pre">0.5</span> <span class="pre">/</span> <span class="pre">cutoff</span></code> s) are bridged by linear interpolation; longer gaps
+split the signal and every segment is filtered with the record-edge handling above, so there
+is no jump at gap edges. The <code class="docutils literal notranslate"><span class="pre">decimate</span> <span class="pre">-&gt;</span> <span class="pre">LowFrequencyFilter</span></code> cascade therefore works on
+gappy recordings.
+Limits: a level jump across a <em>bridged</em> gap is filtered like a real step (500 uV step, 0.1 s
+gap, 0.5 Hz high-pass: &gt;10 uV for about +-1.5 s); lower <code class="docutils literal notranslate"><span class="pre">max_gap_fill</span></code> to split instead.
+Segments of a few samples between long gaps give finite but meaningless values. The default
+<code class="docutils literal notranslate"><span class="pre">0.5</span> <span class="pre">/</span> <span class="pre">cutoff</span></code> is slightly above the measured bridge-versus-split crossover (~0.9 s at 0.5 Hz,
+i.e. ~0.45 / cutoff; the difference near the crossover is small), and is kept.</p></li>
+<li><p>IIR filters use second-order sections (numerically identical response). N-D input is
+supported (time on the last axis).</p></li>
+<li><p>New <code class="docutils literal notranslate"><span class="pre">UserWarning</span></code> for FIRs too short to resolve the cutoff (see the table). The docstring
+used to claim a gain of ~0.25 at the cutoff for FIR filters; the default 101 taps for 0.5 Hz
+at 8 kHz with <code class="docutils literal notranslate"><span class="pre">n_decimate=5</span></code> actually pass 0.94 at 0.5 Hz (-6 dB at ~1.7 Hz). Use about
+<code class="docutils literal notranslate"><span class="pre">n_order</span> <span class="pre">&gt;=</span> <span class="pre">1.5</span> <span class="pre">*</span> <span class="pre">fs</span> <span class="pre">/</span> <span class="pre">2**n_decimate</span> <span class="pre">/</span> <span class="pre">cutoff</span></code> taps or <code class="docutils literal notranslate"><span class="pre">ftype='iir'</span></code>. Defaults are
+unchanged.</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fft_filter</span></code>:</p>
+<ul>
+<li><p>The frequency axis was <code class="docutils literal notranslate"><span class="pre">linspace(0,</span> <span class="pre">fs,</span> <span class="pre">n)</span></code> and the cutoff bin was removed on one side only.
+A 10 Hz tone with a 9.5 Hz cutoff came out at half amplitude from both <code class="docutils literal notranslate"><span class="pre">'lp'</span></code> and <code class="docutils literal notranslate"><span class="pre">'hp'</span></code>.
+Bins are now exact DFT frequencies, applied symmetrically.</p></li>
+<li><p><strong>NaN gaps are handled</strong> like in <code class="docutils literal notranslate"><span class="pre">LowFrequencyFilter</span></code> (v2.0.0: all-NaN output).</p></li>
+<li><p>New <code class="docutils literal notranslate"><span class="pre">edges</span></code> parameter: <code class="docutils literal notranslate"><span class="pre">'periodic'</span></code> (v2.0.0 behaviour, the default for NaN-free input) or
+<code class="docutils literal notranslate"><span class="pre">'extend'</span></code> (the <code class="docutils literal notranslate"><span class="pre">LowFrequencyFilter</span></code> edge handling, the default when the input has NaN).
+<strong>Caution:</strong> with the default <code class="docutils literal notranslate"><span class="pre">edges=None</span></code> one NaN anywhere switches the whole output from
+<code class="docutils literal notranslate"><span class="pre">'periodic'</span></code> to <code class="docutils literal notranslate"><span class="pre">'extend'</span></code> (differences up to ~1 for SD-172 1/f data far from the gap);
+pass <code class="docutils literal notranslate"><span class="pre">edges</span></code> explicitly when the result must not depend on the presence of gaps.
+For a 1 Hz high-pass on a 60 s cut of 1/f data, <code class="docutils literal notranslate"><span class="pre">'extend'</span></code> reduces the edge error from
+~80-100 to ~6-14.</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">buffer</span></code>: <code class="docutils literal notranslate"><span class="pre">overlap</span> <span class="pre">&gt;=</span> <span class="pre">segm_size</span></code> used to hang in an infinite loop; it now raises.
+Non-integer <code class="docutils literal notranslate"><span class="pre">fs</span></code> no longer accumulates drift (0.24 s per hour at 499.9 Hz before). 2-D input
+raises instead of being buffered along the channel axis.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">detrend</span></code>: the default is now a least-squares line fitted to the finite samples. It used to be
+the line through the two endpoints, which a single noisy endpoint tilted. <code class="docutils literal notranslate"><span class="pre">method='endpoints'</span></code>
+restores the old behaviour.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">get_datarate</span></code> accepts 1-D input (it raised). <code class="docutils literal notranslate"><span class="pre">downsample_min_max</span></code> ignores NaN inside a
+window (a single NaN used to make both points of its window NaN).</p></li>
+</ul>
+</section>
+<section id="statistics-brainmaze-utils-stat">
+<h3>Statistics (<a class="reference internal" href="stat.html#module-brainmaze_utils.stat" title="brainmaze_utils.stat"><code class="xref py py-mod docutils literal notranslate"><span class="pre">brainmaze_utils.stat</span></code></a>)<a class="headerlink" href="#statistics-brainmaze-utils-stat" title="Link to this heading">#</a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">combine_mvgauss_distributions</span></code>: the between-group term used an element-wise square instead
+of the outer product, so the cross-covariances were wrong (+1.0 instead of -1.0 in the test
+case). Fixed; the result now equals the pooled (<code class="docutils literal notranslate"><span class="pre">bias=True</span></code>) covariance exactly.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">kl_divergence_nonparametric</span></code>:</p>
+<ul>
+<li><p>The last axis holds the bins. Each distribution (row) is normalised on its own and N-D input
+returns the <strong>sum of the per-row divergences</strong>. For normalised histograms - including the
+<code class="docutils literal notranslate"><span class="pre">(n_features,</span> <span class="pre">n_bins)</span></code> stacks brainmaze-eeg passes - the value is identical to v2.0.0.</p></li>
+<li><p><strong>Breaking for raw counts:</strong> v2.0.0 did not normalise and returned
+<code class="docutils literal notranslate"><span class="pre">sum(c_p</span> <span class="pre">*</span> <span class="pre">log(c_p</span> <span class="pre">/</span> <span class="pre">c_q))</span></code>, which grows with the number of samples and is not a divergence.
+Counts now give the KL divergence of the normalised histograms.</p></li>
+<li><p>Bins with <code class="docutils literal notranslate"><span class="pre">q</span> <span class="pre">==</span> <span class="pre">0,</span> <span class="pre">p</span> <span class="pre">&gt;</span> <span class="pre">0</span></code> give <code class="docutils literal notranslate"><span class="pre">inf</span></code> (they were silently dropped, returning e.g. 0).</p></li>
+<li><p>Optional <code class="docutils literal notranslate"><span class="pre">eps</span></code> adds smoothing. Invalid input raises (see the table).</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="annotations-brainmaze-utils-annotations">
+<h3>Annotations (<a class="reference internal" href="annotations.html#module-brainmaze_utils.annotations" title="brainmaze_utils.annotations"><code class="xref py py-mod docutils literal notranslate"><span class="pre">brainmaze_utils.annotations</span></code></a>)<a class="headerlink" href="#annotations-brainmaze-utils-annotations" title="Link to this heading">#</a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">create_day_indexes</span></code>:</p>
+<ul>
+<li><p>On pandas 3, every epoch got day 0 (a chained assignment that did nothing). On pandas 2 the
+last day could be missed (epochs at +0, +6, +20, +30, +44 h from 22:00 UTC with
+<code class="docutils literal notranslate"><span class="pre">hour=12</span></code> gave <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1,</span> <span class="pre">1]</span></code> instead of <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">1,</span> <span class="pre">2]</span></code>).</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">tzinfo</span></code> argument was ignored.</p></li>
+<li><p>Rewritten: it returns a sorted copy with a <code class="docutils literal notranslate"><span class="pre">day</span></code> column computed on the wall clock of the
+chosen timezone (DST-safe). Numeric timestamps and fractional <code class="docutils literal notranslate"><span class="pre">hour</span></code> are accepted;
+timezone-naive datetimes raise.</p></li>
+<li><p>Unchanged but now documented: for UTC data (e.g. from <code class="docutils literal notranslate"><span class="pre">load_CyberPSG</span></code>) the default cuts days
+at <code class="docutils literal notranslate"><span class="pre">hour</span></code> <strong>UTC</strong>; pass <code class="docutils literal notranslate"><span class="pre">tzinfo</span></code> for the local wall clock.</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">merge_annotations</span></code>: epochs are grouped by <code class="docutils literal notranslate"><span class="pre">annotation</span></code> and by every extra column (e.g.
+<code class="docutils literal notranslate"><span class="pre">channel</span></code>; missing values incl. <code class="docutils literal notranslate"><span class="pre">pd.NA</span></code> form one group), and touching epochs of a group are
+merged. Interleaved channels and overlapping labels therefore merge correctly; unsorted input
+is handled. Extra columns are kept with their dtypes. v2.0.0 merged only rows consecutive in the
+input order and raised on extra columns. For sorted, non-overlapping single-channel input the
+result is unchanged.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tile_annotations</span></code> keeps extra columns (it raised) and, for empty input, the <code class="docutils literal notranslate"><span class="pre">duration</span></code>
+column. <code class="docutils literal notranslate"><span class="pre">load_CyberPSG(...,</span> <span class="pre">tile=...)</span></code> therefore works on files with channel annotations.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">time_to_utc</span></code>, <code class="docutils literal notranslate"><span class="pre">time_to_local</span></code>, <code class="docutils literal notranslate"><span class="pre">time_to_timezone</span></code>, <code class="docutils literal notranslate"><span class="pre">time_to_timestamp</span></code> and
+<code class="docutils literal notranslate"><span class="pre">create_duration</span></code> return copies instead of modifying the input frame, and accept NumPy scalar
+timestamps.</p></li>
+<li><p>CyberPSG:</p>
+<ul>
+<li><p><strong>Writer</strong> (<code class="docutils literal notranslate"><span class="pre">save_CyberPSG</span></code>): the 13 standard labels (<code class="docutils literal notranslate"><span class="pre">AWAKE,</span> <span class="pre">N1,</span> <span class="pre">N2,</span> <span class="pre">N3,</span> <span class="pre">REM,</span> <span class="pre">UNKNOWN,</span>
+<span class="pre">Arousal,</span> <span class="pre">N,</span> <span class="pre">SLP,</span> <span class="pre">IED,</span> <span class="pre">seizure,</span> <span class="pre">seizure_05,</span> <span class="pre">seizure_08</span></code>) are written with the suffix <code class="docutils literal notranslate"><span class="pre">_bm</span></code>
+(<code class="docutils literal notranslate"><span class="pre">N2</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">N2_bm</span></code>); v2.0.0 wrote <code class="docutils literal notranslate"><span class="pre">N2_best</span></code>. The annotation-type <strong>UUIDs are exactly those
+v2.0.0 wrote</strong> (e.g. <code class="docutils literal notranslate"><span class="pre">IED</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">...000000000011</span></code>, <code class="docutils literal notranslate"><span class="pre">seizure</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">...000000000013</span></code>), so
+CyberPSG sees the same types. Input labels <code class="docutils literal notranslate"><span class="pre">N2</span></code>, <code class="docutils literal notranslate"><span class="pre">N2_best</span></code> and <code class="docutils literal notranslate"><span class="pre">N2_bm</span></code> are one type (v2.0.0
+raised <code class="docutils literal notranslate"><span class="pre">KeyError</span></code> for <code class="docutils literal notranslate"><span class="pre">N2</span></code> together with <code class="docutils literal notranslate"><span class="pre">N2_best</span></code>). Other labels are written as given.</p></li>
+<li><p><strong>Loader</strong> (<code class="docutils literal notranslate"><span class="pre">load_CyberPSG</span></code>): strips one of the suffixes <code class="docutils literal notranslate"><span class="pre">_bm</span></code>, <code class="docutils literal notranslate"><span class="pre">_best</span></code>, <code class="docutils literal notranslate"><span class="pre">_aisc</span></code>,
+<code class="docutils literal notranslate"><span class="pre">_PiesPro</span></code> from every label (v2.0.0: <code class="docutils literal notranslate"><span class="pre">_aisc</span></code> and <code class="docutils literal notranslate"><span class="pre">_PiesPro</span></code> only). Files written by
+v2.0.0 (<code class="docutils literal notranslate"><span class="pre">N2_best</span></code>), by this version (<code class="docutils literal notranslate"><span class="pre">N2_bm</span></code>) and mixed collections load to the same labels
+(<code class="docutils literal notranslate"><span class="pre">N2</span></code>); a save/load round trip returns the original labels. New <code class="docutils literal notranslate"><span class="pre">strip_suffixes=False</span></code>
+returns the stored names, e.g. to tell a scorer’s <code class="docutils literal notranslate"><span class="pre">N2</span></code> from a model’s <code class="docutils literal notranslate"><span class="pre">N2_best</span></code> in one
+file (both load as <code class="docutils literal notranslate"><span class="pre">N2</span></code> by default). The annotation group is still named <code class="docutils literal notranslate"><span class="pre">Import_best</span></code>.
+Compatibility: the v2.0.0 loader strips only <code class="docutils literal notranslate"><span class="pre">_aisc</span></code>/<code class="docutils literal notranslate"><span class="pre">_PiesPro</span></code>, so it reads files written
+by this version as <code class="docutils literal notranslate"><span class="pre">N2_bm</span></code>, <code class="docutils literal notranslate"><span class="pre">IED_bm</span></code> etc.; upgrade readers when mixing versions.</p></li>
+<li><p>Annotation types that share a name are no longer dropped (they used to load as
+<code class="docutils literal notranslate"><span class="pre">error_unknown</span></code>).</p></li>
+<li><p>7-digit (.NET) fractional seconds are parsed (truncated to microseconds).</p></li>
+</ul>
+</li>
+<li><p>NSRR: R&amp;K stages 3 and 4 both map to <code class="docutils literal notranslate"><span class="pre">N3</span></code>. Before, any file containing Stage 3 raised
+<code class="docutils literal notranslate"><span class="pre">KeyError</span></code> (the two-way dictionary lost the Stage 3 entry). Custom many-to-one mappings work.</p></li>
+</ul>
+</section>
+<section id="other">
+<h3>Other<a class="headerlink" href="#other" title="Link to this heading">#</a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">vector.get_mutual_vectors(x)</span></code> without labels raised <code class="docutils literal notranslate"><span class="pre">UnboundLocalError</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">vector.translate</span></code> returns a new array and promotes integer input to float. It used to work
+in place and truncate.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">vector.rotate</span></code>: the direction convention is documented (positive = clockwise, about the
+points’ mean).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">types.ObjDict</span></code>: attribute auto-creation works as in v2.0.0 (<code class="docutils literal notranslate"><span class="pre">d.cfg.sub</span> <span class="pre">=</span> <span class="pre">3</span></code> creates
+<code class="docutils literal notranslate"><span class="pre">cfg</span></code>; reading a missing public attribute creates it, so <code class="docutils literal notranslate"><span class="pre">hasattr</span></code> is always true for public
+names). Names starting with <code class="docutils literal notranslate"><span class="pre">_</span></code> (dunders included) are no longer auto-created: this fixes
+<code class="docutils literal notranslate"><span class="pre">copy.deepcopy</span></code>, <code class="docutils literal notranslate"><span class="pre">copy.copy</span></code> and <code class="docutils literal notranslate"><span class="pre">pickle</span></code> of an <code class="docutils literal notranslate"><span class="pre">ObjDict</span></code> (they failed with
+<code class="docutils literal notranslate"><span class="pre">'ObjDict'</span> <span class="pre">object</span> <span class="pre">is</span> <span class="pre">not</span> <span class="pre">callable</span></code>) and stops protocol probes such as <code class="docutils literal notranslate"><span class="pre">__array__</span></code> or
+<code class="docutils literal notranslate"><span class="pre">_repr_html_</span></code> from adding keys.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">files.get_files</span></code> only skips AppleDouble files (basename starting with <code class="docutils literal notranslate"><span class="pre">._</span></code>), not every
+path that contains <code class="docutils literal notranslate"><span class="pre">._</span></code>.</p></li>
+<li><p>Packaging:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">tqdm</span></code> is a runtime dependency. It was imported but only listed under the test extra, so
+a clean install failed to import <code class="docutils literal notranslate"><span class="pre">annotations</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pytz</span></code> was removed (unused).</p></li>
+<li><p>Lower bounds: <code class="docutils literal notranslate"><span class="pre">numpy&gt;=1.24</span></code>, <code class="docutils literal notranslate"><span class="pre">scipy&gt;=1.10</span></code>, <code class="docutils literal notranslate"><span class="pre">pandas&gt;=2.0</span></code>.</p></li>
+<li><p>The stale committed <code class="docutils literal notranslate"><span class="pre">egg-info</span></code> was removed.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+</section>
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="annotations.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Annotations</p>
+      </div>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item"><div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased-after-v2-0-0-correctness-fixes">Unreleased (after v2.0.0): correctness fixes</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#new-exceptions-and-warnings">New exceptions and warnings</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#signal-brainmaze-utils-signal">Signal (<code class="xref py py-mod docutils literal notranslate"><span class="pre">brainmaze_utils.signal</span></code>)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#statistics-brainmaze-utils-stat">Statistics (<code class="xref py py-mod docutils literal notranslate"><span class="pre">brainmaze_utils.stat</span></code>)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#annotations-brainmaze-utils-annotations">Annotations (<code class="xref py py-mod docutils literal notranslate"><span class="pre">brainmaze_utils.annotations</span></code>)</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#other">Other</a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Filip Mivalt M.Sc., Ph.D.
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2020-present, Mayo Clinic Department of Neurology - Laboratory of Bioelectronics Neurophysiology and Engineering. All rights reserved.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="_static/scripts/bootstrap.js?digest=90905a2f556bf617f1a9"></script>
+<script defer src="_static/scripts/pydata-sphinx-theme.js?digest=90905a2f556bf617f1a9"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

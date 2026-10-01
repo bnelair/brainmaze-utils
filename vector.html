@@ -219,6 +219,7 @@
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">Vector</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gaps.html">Gaps (NaN handling)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="annotations.html">Annotations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changes.html">Changes</a></li>
 </ul>
 
     </div>
@@ -412,6 +413,7 @@
 <dt class="sig sig-object py" id="brainmaze_utils.vector.get_mutual_vectors">
 <span class="sig-prename descclassname"><span class="pre">brainmaze_utils.vector.</span></span><span class="sig-name descname"><span class="pre">get_mutual_vectors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.vector.get_mutual_vectors" title="Link to this definition">#</a></dt>
 <dd><p>Compute all pairwise difference vectors between points.</p>
+<p>Row <code class="docutils literal notranslate"><span class="pre">i</span> <span class="pre">*</span> <span class="pre">n_points</span> <span class="pre">+</span> <span class="pre">j</span></code> of the result is <code class="docutils literal notranslate"><span class="pre">x[i]</span> <span class="pre">-</span> <span class="pre">x[j]</span></code> (including <code class="docutils literal notranslate"><span class="pre">i</span> <span class="pre">==</span> <span class="pre">j</span></code>).</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
@@ -527,12 +529,21 @@ For 3D: array of 3 rotation angles [x, y, z] in degrees</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Rotated vectors</p>
+<dd class="field-even"><p>Rotated vectors (new array; <code class="docutils literal notranslate"><span class="pre">x</span></code> is not modified).</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>numpy.ndarray</p>
 </dd>
 </dl>
+<p class="rubric">Notes</p>
+<p>Direction convention: points are row vectors multiplied from the right by the
+matrices of <a class="reference internal" href="#brainmaze_utils.vector.get_rot_2d" title="brainmaze_utils.vector.get_rot_2d"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_rot_2d()</span></code></a> / <a class="reference internal" href="#brainmaze_utils.vector.get_rot_3d" title="brainmaze_utils.vector.get_rot_3d"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_rot_3d()</span></code></a> (<code class="docutils literal notranslate"><span class="pre">x</span> <span class="pre">&#64;</span> <span class="pre">R</span></code>). This is the
+transpose of the usual column-vector convention, so in 2-D a <strong>positive angle
+rotates clockwise</strong>. Rotation is about the <strong>mean of the points</strong> (a single
+point is therefore unchanged): <code class="docutils literal notranslate"><span class="pre">[[0,</span> <span class="pre">0],</span> <span class="pre">[2,</span> <span class="pre">0]]</span></code> rotated by +90 deg becomes
+<code class="docutils literal notranslate"><span class="pre">[[1,</span> <span class="pre">1],</span> <span class="pre">[1,</span> <span class="pre">-1]]</span></code>. In 3-D the rotations are applied in the order x, y, z, each with
+the same row-vector convention. Negate the angle(s) for counter-clockwise
+rotation.</p>
 </dd></dl>
 
 <dl class="py function">
@@ -567,12 +578,20 @@ For 3D: array of 3 rotation angles [x, y, z] in degrees</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Translated vectors</p>
+<dd class="field-even"><p>Translated vectors as a <strong>new</strong> array; <code class="docutils literal notranslate"><span class="pre">x</span></code> is not modified. The dtype is
+promoted as needed (an integer <code class="docutils literal notranslate"><span class="pre">x</span></code> translated by <code class="docutils literal notranslate"><span class="pre">0.5</span></code> gives floats).</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>numpy.ndarray</p>
 </dd>
 </dl>
+<p class="rubric">Notes</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Changed after v2.0.0:</strong>
+Previously <code class="docutils literal notranslate"><span class="pre">x</span></code> was modified in place and the result kept <code class="docutils literal notranslate"><span class="pre">x</span></code>’s dtype, so
+integer input silently truncated fractional offsets.</p>
+</div>
 </dd></dl>
 
 </section>

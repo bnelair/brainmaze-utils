@@ -219,6 +219,7 @@
 <li class="toctree-l1"><a class="reference internal" href="vector.html">Vector</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gaps.html">Gaps (NaN handling)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="annotations.html">Annotations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changes.html">Changes</a></li>
 </ul>
 
     </div>
@@ -417,96 +418,239 @@
                   
   <section id="module-brainmaze_utils.signal">
 <span id="signal"></span><h1>Signal<a class="headerlink" href="#module-brainmaze_utils.signal" title="Link to this heading">#</a></h1>
-<p>Tools for digital signal processing: fft filtering, low-frequency filtering utilizing downsampling etc.</p>
+<p>Tools for digital signal processing: decimation/resampling, FFT filtering, low-frequency
+filtering utilizing downsampling, buffering etc.</p>
+<p><strong>Conventions</strong></p>
+<ul class="simple">
+<li><p>Multichannel arrays are <code class="docutils literal notranslate"><span class="pre">(n_signals,</span> <span class="pre">n_samples)</span></code>: time runs along the <strong>last</strong> axis.</p></li>
+<li><p>Sampling frequencies and cutoffs are in Hz, durations in seconds.</p></li>
+<li><p>Functions do not modify their inputs.</p></li>
+<li><p>NaN marks missing data (gaps); each function documents how it treats NaN.</p></li>
+</ul>
+<p><strong>Which functions filter?</strong></p>
+<div class="pst-scrollable-table-container"><table class="table">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 40.0%" />
+<col style="width: 35.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Function</p></th>
+<th class="head"><p>Anti-aliasing / filtering</p></th>
+<th class="head"><p>NaN handling</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><a class="reference internal" href="#brainmaze_utils.signal.decimate" title="brainmaze_utils.signal.decimate"><code class="xref py py-func docutils literal notranslate"><span class="pre">decimate()</span></code></a></p></td>
+<td><p><strong>yes</strong>: 16th-order Butterworth (SOS, zero-phase), default cutoff <code class="docutils literal notranslate"><span class="pre">fs_new</span> <span class="pre">/</span> <span class="pre">3</span></code></p></td>
+<td><p>interpolated for filtering, re-masked in the output</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#brainmaze_utils.signal.nandecimate" title="brainmaze_utils.signal.nandecimate"><code class="xref py py-func docutils literal notranslate"><span class="pre">nandecimate()</span></code></a></p></td>
+<td><p>yes, weak: 30-tap FIR (legacy; prefer <a class="reference internal" href="#brainmaze_utils.signal.decimate" title="brainmaze_utils.signal.decimate"><code class="xref py py-func docutils literal notranslate"><span class="pre">decimate()</span></code></a>)</p></td>
+<td><p>mean-filled for filtering, re-masked in the output</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#brainmaze_utils.signal.resample" title="brainmaze_utils.signal.resample"><code class="xref py py-func docutils literal notranslate"><span class="pre">resample()</span></code></a></p></td>
+<td><p><strong>no</strong> - interpolation only, by design; low-pass first when downsampling</p></td>
+<td><p>never interpolated across; an output is NaN if a bracketing input sample is.
+When downsampling, a gap shorter than one output period can vanish</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#brainmaze_utils.signal.unify_sampling_frequency" title="brainmaze_utils.signal.unify_sampling_frequency"><code class="xref py py-func docutils literal notranslate"><span class="pre">unify_sampling_frequency()</span></code></a></p></td>
+<td><p>yes (calls <a class="reference internal" href="#brainmaze_utils.signal.decimate" title="brainmaze_utils.signal.decimate"><code class="xref py py-func docutils literal notranslate"><span class="pre">decimate()</span></code></a>)</p></td>
+<td><p>as <a class="reference internal" href="#brainmaze_utils.signal.decimate" title="brainmaze_utils.signal.decimate"><code class="xref py py-func docutils literal notranslate"><span class="pre">decimate()</span></code></a></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#brainmaze_utils.signal.downsample_min_max" title="brainmaze_utils.signal.downsample_min_max"><code class="xref py py-func docutils literal notranslate"><span class="pre">downsample_min_max()</span></code></a></p></td>
+<td><p>no (min/max envelope, for display)</p></td>
+<td><p>NaN ignored within a window</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#brainmaze_utils.signal.LowFrequencyFilter" title="brainmaze_utils.signal.LowFrequencyFilter"><code class="xref py py-class docutils literal notranslate"><span class="pre">LowFrequencyFilter</span></code></a></p></td>
+<td><p>is itself a zero-phase low-/high-pass</p></td>
+<td><p>short gaps bridged, long gaps split into separately filtered segments; NaN
+out exactly where NaN in (<code class="docutils literal notranslate"><span class="pre">inf</span></code> raises)</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#brainmaze_utils.signal.fft_filter" title="brainmaze_utils.signal.fft_filter"><code class="xref py py-func docutils literal notranslate"><span class="pre">fft_filter()</span></code></a></p></td>
+<td><p>is itself a brick-wall low-/high-pass</p></td>
+<td><p>as <a class="reference internal" href="#brainmaze_utils.signal.LowFrequencyFilter" title="brainmaze_utils.signal.LowFrequencyFilter"><code class="xref py py-class docutils literal notranslate"><span class="pre">LowFrequencyFilter</span></code></a></p></td>
+</tr>
+</tbody>
+</table>
+</div>
 <dl class="py class">
 <dt class="sig sig-object py" id="brainmaze_utils.signal.LowFrequencyFilter">
-<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">brainmaze_utils.signal.</span></span><span class="sig-name descname"><span class="pre">LowFrequencyFilter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutoff</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_decimate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dec_cutoff</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'lp'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ftype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'fir'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.signal.LowFrequencyFilter" title="Link to this definition">#</a></dt>
-<dd><dl class="field-list simple">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">brainmaze_utils.signal.</span></span><span class="sig-name descname"><span class="pre">LowFrequencyFilter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutoff</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_decimate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dec_cutoff</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'lp'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ftype</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'fir'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_gap_fill</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.signal.LowFrequencyFilter" title="Link to this definition">#</a></dt>
+<dd><p>Zero-phase low-pass or high-pass filter for very low cutoff frequencies relative to
+the sampling rate (e.g. a 0.5 Hz high-pass on 8 kHz data), implemented as a
+decimate -&gt; filter -&gt; upsample cascade.</p>
+<p>A cutoff of <code class="docutils literal notranslate"><span class="pre">1e-4</span> <span class="pre">*</span> <span class="pre">fs</span></code> cannot be realised well by a direct filter (an FIR would
+need ~1e5 taps, an IIR is ill-conditioned). Instead the signal is</p>
+<ol class="arabic simple">
+<li><p>halved in rate <code class="docutils literal notranslate"><span class="pre">n_decimate</span></code> times: each step applies a zero-phase
+anti-aliasing low-pass (normalised cutoff <code class="docutils literal notranslate"><span class="pre">dec_cutoff</span></code> x Nyquist of that
+stage) and keeps every 2nd sample;</p></li>
+<li><p>low-passed at <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> at the low rate <code class="docutils literal notranslate"><span class="pre">fs</span> <span class="pre">/</span> <span class="pre">2**n_decimate</span></code> (zero-phase);</p></li>
+<li><p>brought back to <code class="docutils literal notranslate"><span class="pre">fs</span></code> by <code class="docutils literal notranslate"><span class="pre">n_decimate</span></code> steps of zero-insertion followed by
+the same anti-aliasing low-pass (gain 2).</p></li>
+</ol>
+<p>The result of 1-3 is the low-frequency content of the signal. <code class="docutils literal notranslate"><span class="pre">filter_type='lp'</span></code>
+returns it; <code class="docutils literal notranslate"><span class="pre">filter_type='hp'</span></code> returns <code class="docutils literal notranslate"><span class="pre">x</span></code> minus it.</p>
+<dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>fs</strong> (<em>float</em>) – sampling frequency</p></li>
-<li><p><strong>cutoff</strong> (<em>float</em>) – frequency cutoff</p></li>
-<li><p><strong>n_decimate</strong> (<em>int</em>) – how many times the signal will be downsampled before the low frequency filtering</p></li>
-<li><p><strong>n_order</strong> (<em>int</em>) – n-th order filter used for filtration</p></li>
-<li><p><strong>dec_cutoff</strong> (<em>float</em>) – relative frequency at which the signal will be filtered when downsampled</p></li>
-<li><p><strong>filter_type</strong> (<em>str</em>) – <p>Which side of <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> is returned:</p>
+<li><p><strong>fs</strong> (<em>float</em>) – Sampling frequency of the signals that will be filtered, in Hz.</p></li>
+<li><p><strong>cutoff</strong> (<em>float</em>) – Cutoff frequency in Hz. Must lie below the Nyquist frequency of the low rate,
+<code class="docutils literal notranslate"><span class="pre">cutoff</span> <span class="pre">&lt;</span> <span class="pre">fs</span> <span class="pre">/</span> <span class="pre">2**n_decimate</span> <span class="pre">/</span> <span class="pre">2</span></code>, and should lie well inside the band kept
+by the anti-aliasing stages (<code class="docutils literal notranslate"><span class="pre">&lt;</span> <span class="pre">dec_cutoff</span> <span class="pre">*</span> <span class="pre">fs</span> <span class="pre">/</span> <span class="pre">2**(n_decimate</span> <span class="pre">+</span> <span class="pre">1)</span></code>).</p></li>
+<li><p><strong>n_decimate</strong> (<em>int</em>) – Number of halving steps (<code class="docutils literal notranslate"><span class="pre">&gt;=</span> <span class="pre">0</span></code>). The cutoff filter runs at
+<code class="docutils literal notranslate"><span class="pre">fs</span> <span class="pre">/</span> <span class="pre">2**n_decimate</span></code>. Choose it so that this rate is ~20-500 x <code class="docutils literal notranslate"><span class="pre">cutoff</span></code>,
+e.g. <code class="docutils literal notranslate"><span class="pre">n_decimate=5</span></code> (250 Hz) for 0.5 Hz on 8 kHz data.</p></li>
+<li><p><strong>n_order</strong> (<em>int</em><em>, </em><em>optional</em>) – Filter order: number of taps for <code class="docutils literal notranslate"><span class="pre">ftype='fir'</span></code> (default 101), Butterworth
+order for <code class="docutils literal notranslate"><span class="pre">ftype='iir'</span></code> (default 3). Used for both the anti-aliasing and the
+cutoff filter. An FIR needs about <code class="docutils literal notranslate"><span class="pre">n_order</span> <span class="pre">&gt;=</span> <span class="pre">1.5</span> <span class="pre">*</span> <span class="pre">fs_low</span> <span class="pre">/</span> <span class="pre">cutoff</span></code> taps to
+resolve the cutoff (<code class="docutils literal notranslate"><span class="pre">fs_low</span> <span class="pre">=</span> <span class="pre">fs</span> <span class="pre">/</span> <span class="pre">2**n_decimate</span></code>), otherwise its transition
+band is much wider than <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> and the effective cutoff is higher: the
+default 101 taps for 0.5 Hz at <code class="docutils literal notranslate"><span class="pre">fs_low</span> <span class="pre">=</span> <span class="pre">250</span></code> Hz pass 0.94 at 0.5 Hz and reach
+-6 dB only at ~1.7 Hz. A <code class="docutils literal notranslate"><span class="pre">UserWarning</span></code> is issued when the FIR’s low-frequency
+gain at <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> exceeds 0.3 (nominal 0.25).</p></li>
+<li><p><strong>dec_cutoff</strong> (<em>float</em>) – Normalised (to the Nyquist of each stage, <code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">&lt;</span> <span class="pre">dec_cutoff</span> <span class="pre">&lt;</span> <span class="pre">1</span></code>) cutoff of the
+anti-aliasing low-pass used by the halving/upsampling steps. Default 0.3.</p></li>
+<li><p><strong>filter_type</strong> (<em>{'lp'</em><em>, </em><em>'hp'}</em>) – <p>Which side of <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> is returned:</p>
 <ul>
 <li><p><code class="docutils literal notranslate"><span class="pre">'lp'</span></code> returns the low-frequency content <strong>below</strong> <code class="docutils literal notranslate"><span class="pre">cutoff</span></code>.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">'hp'</span></code> returns <code class="docutils literal notranslate"><span class="pre">x</span></code> minus that low-frequency content, i.e. the
-high-frequency content <strong>above</strong> <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> (use this to remove slow drift).</p></li>
+content <strong>above</strong> <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> (use this to remove slow drift / DC).</p></li>
 </ul>
-<p>Pick the one that matches the content you want to keep – see the examples.</p>
 </p></li>
-<li><p><strong>ftype</strong> (<em>str</em>) – ‘fir’ or ‘iir’</p></li>
+<li><p><strong>max_gap_fill</strong> (<em>float</em><em>, </em><em>optional</em>) – NaN gaps (interior runs of NaN) shorter than this many <strong>seconds</strong> are bridged
+by linear interpolation before filtering; longer gaps split the signal into
+segments that are filtered separately. Default <code class="docutils literal notranslate"><span class="pre">0.5</span> <span class="pre">/</span> <span class="pre">cutoff</span></code> (1 s for
+0.5 Hz). <code class="docutils literal notranslate"><span class="pre">0</span></code> always splits. See <em>Gaps</em> in the notes.</p></li>
+<li><p><strong>ftype</strong> (<em>{'fir'</em><em>, </em><em>'iir'}</em>) – <code class="docutils literal notranslate"><span class="pre">'fir'</span></code>: <code class="xref py py-func docutils literal notranslate"><span class="pre">scipy.signal.firwin()</span></code> windowed-sinc filters (<code class="docutils literal notranslate"><span class="pre">cutoff</span></code> is the
+design -6 dB point). <code class="docutils literal notranslate"><span class="pre">'iir'</span></code>: Butterworth filters in second-order sections
+(<code class="docutils literal notranslate"><span class="pre">cutoff</span></code> is the design -3 dB point). All filters are applied forward and
+backward, so the phase is zero and the magnitude response is squared: at
+<code class="docutils literal notranslate"><span class="pre">cutoff</span></code> the low-frequency gain is ~0.5 (IIR) or ~0.25 (FIR, <strong>only if</strong> it
+has enough taps, see <code class="docutils literal notranslate"><span class="pre">n_order</span></code>).</p></li>
 </ul>
 </dd>
 </dl>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">10000</span><span class="p">)</span>
+<p class="rubric">Examples</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">brainmaze_utils.signal</span><span class="w"> </span><span class="kn">import</span> <span class="n">LowFrequencyFilter</span>
 
-<span class="c1"># keep slow content below the cutoff (e.g. isolate drift / a slow oscillation)</span>
-<span class="n">lowpass</span> <span class="o">=</span> <span class="n">LowFrequencyFilter</span><span class="p">(</span><span class="n">fs</span><span class="o">=</span><span class="n">fs</span><span class="p">,</span> <span class="n">cutoff</span><span class="o">=</span><span class="n">cutoff</span><span class="p">,</span> <span class="n">n_decimate</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">n_order</span><span class="o">=</span><span class="mi">101</span><span class="p">,</span> <span class="n">filter_type</span><span class="o">=</span><span class="s1">'lp'</span><span class="p">)</span>
-<span class="n">x_slow</span> <span class="o">=</span> <span class="n">lowpass</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="n">fs</span> <span class="o">=</span> <span class="mi">8000</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="mi">60</span> <span class="o">*</span> <span class="n">fs</span><span class="p">)</span> <span class="o">+</span> <span class="mf">1500.0</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">60</span> <span class="o">*</span> <span class="n">fs</span><span class="p">)</span>  <span class="c1"># DC + drift</span>
 
-<span class="c1"># remove slow drift, keeping content above the cutoff</span>
-<span class="n">highpass</span> <span class="o">=</span> <span class="n">LowFrequencyFilter</span><span class="p">(</span><span class="n">fs</span><span class="o">=</span><span class="n">fs</span><span class="p">,</span> <span class="n">cutoff</span><span class="o">=</span><span class="n">cutoff</span><span class="p">,</span> <span class="n">n_decimate</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">n_order</span><span class="o">=</span><span class="mi">101</span><span class="p">,</span> <span class="n">filter_type</span><span class="o">=</span><span class="s1">'hp'</span><span class="p">)</span>
-<span class="n">x_detrended</span> <span class="o">=</span> <span class="n">highpass</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+<span class="c1"># remove DC and slow drift below 0.5 Hz (high-pass), keep everything above</span>
+<span class="n">hp</span> <span class="o">=</span> <span class="n">LowFrequencyFilter</span><span class="p">(</span><span class="n">fs</span><span class="o">=</span><span class="n">fs</span><span class="p">,</span> <span class="n">cutoff</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">n_decimate</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">ftype</span><span class="o">=</span><span class="s1">'iir'</span><span class="p">,</span> <span class="n">n_order</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">filter_type</span><span class="o">=</span><span class="s1">'hp'</span><span class="p">)</span>
+<span class="n">x_hp</span> <span class="o">=</span> <span class="n">hp</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+<span class="c1"># keep only the slow content below 0.5 Hz</span>
+<span class="n">lp</span> <span class="o">=</span> <span class="n">LowFrequencyFilter</span><span class="p">(</span><span class="n">fs</span><span class="o">=</span><span class="n">fs</span><span class="p">,</span> <span class="n">cutoff</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">n_decimate</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">ftype</span><span class="o">=</span><span class="s1">'iir'</span><span class="p">,</span> <span class="n">n_order</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">filter_type</span><span class="o">=</span><span class="s1">'lp'</span><span class="p">)</span>
+<span class="n">x_slow</span> <span class="o">=</span> <span class="n">lp</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
 </pre></div>
+</div>
+<p class="rubric">Notes</p>
+<p><strong>Input.</strong> <code class="docutils literal notranslate"><span class="pre">x</span></code> may be 1-D <code class="docutils literal notranslate"><span class="pre">(n_samples,)</span></code> or N-D with time along the <strong>last</strong>
+axis, e.g. <code class="docutils literal notranslate"><span class="pre">(n_channels,</span> <span class="pre">n_samples)</span></code>. NaN marks gaps (see below); <code class="docutils literal notranslate"><span class="pre">inf</span></code> raises
+<code class="docutils literal notranslate"><span class="pre">ValueError</span></code>. The input is not modified.</p>
+<p><strong>Gaps (NaN).</strong> The output is NaN exactly where the input is NaN, and finite
+everywhere else, so the filter can follow a NaN-aware <a class="reference internal" href="#brainmaze_utils.signal.decimate" title="brainmaze_utils.signal.decimate"><code class="xref py py-func docutils literal notranslate"><span class="pre">decimate()</span></code></a> in a
+downsampling cascade.</p>
+<ul class="simple">
+<li><p>Gaps shorter than <code class="docutils literal notranslate"><span class="pre">max_gap_fill</span></code> (default half a cutoff period, e.g. dropped
+samples) are bridged by linear interpolation, filtered through, and re-masked.
+The bridge does not check the two sides for a level jump: a jump across a
+bridged gap (amplifier re-zero, reconnection after a dropout) is filtered as a
+genuine step. E.g. a 500 uV DC step across a 0.1 s gap at 0.5 Hz high-pass gives
+a transient above 10 uV for about +-1.5 s around the gap (the same as the response
+to a real step). If such jumps are expected, lower <code class="docutils literal notranslate"><span class="pre">max_gap_fill</span></code> below the gap
+length (<code class="docutils literal notranslate"><span class="pre">0</span></code> always splits) so that each side is filtered on its own.</p></li>
+<li><p>Longer gaps split the signal: each valid segment is filtered on its own, with
+the same edge handling as the record edges (below), so there is no jump at a
+gap edge, and nothing on one side of a long gap affects the other side.
+A segment shorter than about <code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">/</span> <span class="pre">cutoff</span></code> s (e.g. a few samples between two
+long gaps) carries no information at the cutoff frequency: its output is finite
+but is not a meaningful low-/high-pass estimate (a 3-sample segment can be off by
+about 10 for SD-20 data). Treat such segments as unusable.</p></li>
+</ul>
+<p>Measured on 1/f noise (SD 20) with offset, drift and a 10 Hz tone, 0.5 Hz IIR
+high-pass, maximum error within 10 s of a gap compared with the same signal
+without the gap: 1 ms gap 0.008, 10 ms 0.14, 100 ms 0.95 (bridged); 1 s 5.4,
+10 s 7.5 (split; bridging would give 6.0 and 8.1). The error next to a split
+gap is the record-edge error described below. Leading and trailing NaN are
+simply excluded. A multichannel array whose channels share the same gaps is
+processed in one pass. Every split segment is extended by <code class="docutils literal notranslate"><span class="pre">3</span> <span class="pre">/</span> <span class="pre">cutoff</span></code> s at both
+ends, so many long gaps cost time: 10 min at 8 kHz (0.5 Hz IIR) takes 1.3 s
+without gaps, 1.5 s with 500 dropouts, 2.8 s with 50 two-second gaps and 11 s
+with 300 split segments.</p>
+<p><strong>Record edges.</strong> A filter with a 0.5 Hz cutoff has a transient lasting
+seconds, so what is assumed about the signal beyond the two ends of the record
+determines the first and last few seconds of the output. This class</p>
+<ol class="arabic simple">
+<li><p>removes a least-squares straight line (offset + drift) from each signal and
+adds it back to the low-frequency output (a zero-phase low-pass passes a
+straight line unchanged, so for <code class="docutils literal notranslate"><span class="pre">'hp'</span></code> offset and linear drift are removed
+exactly, edges included);</p></li>
+<li><p>extends each end by <code class="docutils literal notranslate"><span class="pre">max(3</span> <span class="pre">/</span> <span class="pre">cutoff</span> <span class="pre">s,</span> <span class="pre">the</span> <span class="pre">legacy</span> <span class="pre">pad)</span></code> samples: a line fitted
+to the outermost <code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">/</span> <span class="pre">cutoff</span></code> s is extrapolated and the residual is mirrored
+about it, so the extension is continuous in value and slope with the data;</p></li>
+<li><p>runs the cascade on the extended signal and crops the extension.</p></li>
+</ol>
+<p>For a signal with a 2000 (uV) offset, a 40 uV/s drift and three 10 uV tones
+(3, 10, 40 Hz) at 8 kHz, a 0.5 Hz <code class="docutils literal notranslate"><span class="pre">'hp'</span></code> (<code class="docutils literal notranslate"><span class="pre">n_decimate=5</span></code>, IIR order 3) gives
+a maximum edge error of ~0.75 uV over the first/last second (previously ~1900 uV);
+offset and drift no longer contribute at all (the output equals that for the
+zero-mean signal). The remaining edge error is the irreducible effect of not
+knowing the signal beyond the record, of the order of <code class="docutils literal notranslate"><span class="pre">A</span> <span class="pre">*</span> <span class="pre">cutoff</span> <span class="pre">/</span> <span class="pre">(pi</span> <span class="pre">*</span> <span class="pre">f)</span></code>
+for a component of amplitude <code class="docutils literal notranslate"><span class="pre">A</span></code> at frequency <code class="docutils literal notranslate"><span class="pre">f</span></code>; on 1/f-like EEG it scales
+with the signal power near and below <code class="docutils literal notranslate"><span class="pre">cutoff</span></code>. Far from the edges (more than
+~3 / cutoff s), the output equals that of the cascade applied to an infinitely
+long signal.</p>
+<p>Design choice: extensions were compared on synthetic data (scripts in the PR). On
+1/f-like signals the mirrored extension gives the smallest edge error (zero
+extension of the detrended signal is ~18 % worse); for a signal whose content lies
+entirely well above <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> (pure tones), zero extension would be ~2x better
+(0.36 vs 0.77 uV in the example above) but only without any offset or drift.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Changed after v2.0.0:</strong>
+The signal used to be zero-padded by only <code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">*</span> <span class="pre">n_order</span> <span class="pre">*</span> <span class="pre">2**n_decimate</span></code>
+samples (e.g. 24 ms for a 0.5 Hz filter at 8 kHz). Any offset therefore became a
+step at both edges (output off by about half the offset, e.g. ~1000 uV for a
+2000 uV offset, over the first/last seconds), and the filter transient reached far
+into the record. The frequency response in the interior is unchanged. IIR filters
+are now applied in second-order sections (numerically identical response; the
+<code class="docutils literal notranslate"><span class="pre">b_*</span></code>/<code class="docutils literal notranslate"><span class="pre">a_*</span></code> attributes are kept for reference). N-D input is supported.
+NaN gaps are handled (see <em>Gaps</em>); v2.0.0 returned an <strong>all-NaN</strong> output for
+any input containing a NaN. <code class="docutils literal notranslate"><span class="pre">inf</span></code> raises <code class="docutils literal notranslate"><span class="pre">ValueError</span></code>. Short FIRs that
+cannot resolve the cutoff now emit a <code class="docutils literal notranslate"><span class="pre">UserWarning</span></code>.</p>
 </div>
 <dl class="py method">
 <dt class="sig sig-object py" id="brainmaze_utils.signal.LowFrequencyFilter.decimate">
 <span class="sig-name descname"><span class="pre">decimate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.signal.LowFrequencyFilter.decimate" title="Link to this definition">#</a></dt>
-<dd><p>Apply anti-aliasing filter and downsample signal by factor of 2.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>X</strong> (<em>numpy.ndarray</em>) – Input signal</p>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Downsampled signal</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>numpy.ndarray</p>
-</dd>
-</dl>
+<dd><p>Anti-aliasing low-pass (zero-phase) and downsampling by 2 along the last axis.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="brainmaze_utils.signal.LowFrequencyFilter.design_filters">
 <span class="sig-name descname"><span class="pre">design_filters</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.signal.LowFrequencyFilter.design_filters" title="Link to this definition">#</a></dt>
-<dd><p>Design decimation and filtering coefficients based on filter type (FIR or IIR).</p>
+<dd><p>Design the anti-aliasing (<code class="docutils literal notranslate"><span class="pre">*_dec</span></code>) and cutoff (<code class="docutils literal notranslate"><span class="pre">*_filt</span></code>) filters and the
+edge-extension length <code class="docutils literal notranslate"><span class="pre">n_pad</span></code> (samples at <code class="docutils literal notranslate"><span class="pre">fs</span></code>).</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="brainmaze_utils.signal.LowFrequencyFilter.filter_signal">
 <span class="sig-name descname"><span class="pre">filter_signal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.signal.LowFrequencyFilter.filter_signal" title="Link to this definition">#</a></dt>
-<dd><p>Apply low-frequency filter using decimation/upsampling strategy.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>X</strong> (<em>numpy.ndarray</em>) – Input signal</p>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Filtered signal</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>numpy.ndarray</p>
-</dd>
-</dl>
+<dd><p>Low-frequency content of <code class="docutils literal notranslate"><span class="pre">X</span></code> (below <code class="docutils literal notranslate"><span class="pre">cutoff</span></code>), same shape as <code class="docutils literal notranslate"><span class="pre">X</span></code>.</p>
+<p>See the class notes for the edge and NaN handling: every run of valid samples
+between NaN gaps is filtered on its own, and NaN samples stay NaN. Raises
+<code class="docutils literal notranslate"><span class="pre">ValueError</span></code> if <code class="docutils literal notranslate"><span class="pre">X</span></code> contains inf.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="brainmaze_utils.signal.LowFrequencyFilter.upsample">
 <span class="sig-name descname"><span class="pre">upsample</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.signal.LowFrequencyFilter.upsample" title="Link to this definition">#</a></dt>
-<dd><p>Upsample signal by factor of 2 using zero-insertion and filtering.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>X</strong> (<em>numpy.ndarray</em>) – Input signal</p>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Upsampled signal</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>numpy.ndarray</p>
-</dd>
-</dl>
+<dd><p>Upsample by 2 along the last axis: zero-insertion, then the anti-aliasing
+low-pass (zero-phase) with gain 2.</p>
 </dd></dl>
 
 </dd></dl>
@@ -538,22 +682,34 @@ If nperseg is None, the spectrum is estimated from the whole signal in a single 
 <dl class="py function">
 <dt class="sig sig-object py" id="brainmaze_utils.signal.buffer">
 <span class="sig-prename descclassname"><span class="pre">brainmaze_utils.signal.</span></span><span class="sig-name descname"><span class="pre">buffer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">segm_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">overlap</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">drop</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.signal.buffer" title="Link to this definition">#</a></dt>
-<dd><p>Buffer signal into matrix</p>
+<dd><p>Cut a 1-D signal into (optionally overlapping) fixed-length segments.</p>
+<p>Segment <code class="docutils literal notranslate"><span class="pre">k</span></code> starts at sample <code class="docutils literal notranslate"><span class="pre">round(k</span> <span class="pre">*</span> <span class="pre">(segm_size</span> <span class="pre">-</span> <span class="pre">overlap)</span> <span class="pre">*</span> <span class="pre">fs)</span></code> - start
+positions are computed from exact times, so there is no cumulative drift for
+non-integer <code class="docutils literal notranslate"><span class="pre">fs</span> <span class="pre">*</span> <span class="pre">(segm_size</span> <span class="pre">-</span> <span class="pre">overlap)</span></code>. Every segment has
+<code class="docutils literal notranslate"><span class="pre">round(segm_size</span> <span class="pre">*</span> <span class="pre">fs)</span></code> samples.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>x</strong> (<em>np.ndarray</em>) – Signal to be</p></li>
-<li><p><strong>fs</strong> (<em>float</em>) – Sampling frequency</p></li>
-<li><p><strong>segm_size</strong> (<em>float</em>) – Segment size in seconds</p></li>
-<li><p><strong>overlap</strong> (<em>float</em>) – Overlap size in seconds</p></li>
-<li><p><strong>drop</strong> (<em>bool</em>) – Drop last segment if True, else append zeros</p></li>
+<li><p><strong>x</strong> (<em>numpy.ndarray</em>) – 1-D signal <code class="docutils literal notranslate"><span class="pre">(n_samples,)</span></code>. For multichannel data call per channel.</p></li>
+<li><p><strong>fs</strong> (<em>float</em>) – Sampling frequency in Hz.</p></li>
+<li><p><strong>segm_size</strong> (<em>float</em><em>, </em><em>optional</em>) – Segment length in seconds. If <code class="docutils literal notranslate"><span class="pre">None</span></code>, <code class="docutils literal notranslate"><span class="pre">x</span></code> is returned unchanged.</p></li>
+<li><p><strong>overlap</strong> (<em>float</em>) – Overlap between consecutive segments in seconds, <code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">&lt;=</span> <span class="pre">overlap</span> <span class="pre">&lt;</span> <span class="pre">segm_size</span></code>.</p></li>
+<li><p><strong>drop</strong> (<em>bool</em>) – If <code class="docutils literal notranslate"><span class="pre">True</span></code> (default) a trailing incomplete segment is dropped; otherwise one
+final segment covering the remaining samples is zero-padded (<code class="docutils literal notranslate"><span class="pre">False</span></code> for
+boolean input) to full length.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>buffered_signal</strong></p>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">(n_segments,</span> <span class="pre">round(segm_size</span> <span class="pre">*</span> <span class="pre">fs))</span></code> with the dtype of <code class="docutils literal notranslate"><span class="pre">x</span></code>. NaNs are
+copied as-is. If no segment fits, the result has shape <code class="docutils literal notranslate"><span class="pre">(0,</span> <span class="pre">n_segm)</span></code>.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>np.ndarray</p>
+<dd class="field-odd"><p>numpy.ndarray</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If <code class="docutils literal notranslate"><span class="pre">x</span></code> is not 1-D, or <code class="docutils literal notranslate"><span class="pre">overlap</span></code> is negative or <code class="docutils literal notranslate"><span class="pre">&gt;=</span> <span class="pre">segm_size</span></code>
+    (which previously caused an infinite loop), or the hop
+    <code class="docutils literal notranslate"><span class="pre">segm_size</span> <span class="pre">-</span> <span class="pre">overlap</span></code> is shorter than one sample.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -561,45 +717,141 @@ If nperseg is None, the spectrum is estimated from the whole signal in a single 
 <dl class="py function">
 <dt class="sig sig-object py" id="brainmaze_utils.signal.decimate">
 <span class="sig-prename descclassname"><span class="pre">brainmaze_utils.signal.</span></span><span class="sig-name descname"><span class="pre">decimate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fs_new</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutoff</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">datarate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.signal.decimate" title="Link to this definition">#</a></dt>
-<dd><p>Downsample signal with anti-aliasing filter (Butterworth - 16th order).
-Works for signals with NaN values - replaced by zero.
-Can return also data-rate. Can take matrix where signals are stacked in 0th dim.</p>
+<dd><p>Resample signal(s) to <code class="docutils literal notranslate"><span class="pre">fs_new</span></code> with a zero-phase anti-aliasing low-pass filter.
+NaN-aware. Despite the name it also upsamples (<code class="docutils literal notranslate"><span class="pre">fs_new</span> <span class="pre">&gt;</span> <span class="pre">fs</span></code>).</p>
+<p>Processing steps, per signal:</p>
+<ol class="arabic simple">
+<li><p>NaN samples are temporarily filled by linear interpolation between the
+neighbouring valid samples (leading/trailing NaNs take the nearest valid
+value) so the filter does not see steps at gap edges.</p></li>
+<li><p>Zero-phase low-pass at <code class="docutils literal notranslate"><span class="pre">cutoff</span></code>: 16th-order Butterworth in second-order
+sections, applied forward and backward (<code class="xref py py-func docutils literal notranslate"><span class="pre">scipy.signal.sosfiltfilt()</span></code>); the
+magnitude response is therefore that of a 32nd-order filter with -6 dB at
+<code class="docutils literal notranslate"><span class="pre">cutoff</span></code>. When upsampling it is skipped if <code class="docutils literal notranslate"><span class="pre">cutoff</span> <span class="pre">&gt;=</span> <span class="pre">0.45</span> <span class="pre">*</span> <span class="pre">fs</span></code>: the
+input holds nothing above <code class="docutils literal notranslate"><span class="pre">fs</span> <span class="pre">/</span> <span class="pre">2</span></code>, and the interpolator (step 3) already
+band-limits to <code class="docutils literal notranslate"><span class="pre">0.45</span> <span class="pre">*</span> <span class="pre">fs</span></code>.</p></li>
+<li><p>Output sample <code class="docutils literal notranslate"><span class="pre">k</span></code> is the filtered signal at time exactly <code class="docutils literal notranslate"><span class="pre">k</span> <span class="pre">/</span> <span class="pre">fs_new</span></code> s;
+the output has <code class="docutils literal notranslate"><span class="pre">n_new</span> <span class="pre">=</span> <span class="pre">round(n_samples</span> <span class="pre">*</span> <span class="pre">fs_new</span> <span class="pre">/</span> <span class="pre">fs)</span></code> samples.</p>
+<ul class="simple">
+<li><p>Integer ratios <code class="docutils literal notranslate"><span class="pre">fs</span> <span class="pre">/</span> <span class="pre">fs_new</span></code> pick every <code class="docutils literal notranslate"><span class="pre">q</span></code>-th sample (exact).</p></li>
+<li><p>Any other ratio, including upsampling and rates with decimals such as
+30000.5 or 511.9999 Hz, evaluates the band-limited signal at the exact times
+with a Kaiser-windowed sinc interpolator (2 x 5 to 2 x 40 taps, designed for
+120 dB). The position of every output sample is computed directly from
+<code class="docutils literal notranslate"><span class="pre">k</span> <span class="pre">*</span> <span class="pre">fs</span> <span class="pre">/</span> <span class="pre">fs_new</span></code>, so there is <strong>no timing drift</strong>, however long the record
+(timing error &lt; 1e-6 samples). Interpolation error for content inside the
+band is ~1e-7 of its amplitude (measured on tones; the integer path is
+exact).</p></li>
+</ul>
+</li>
+<li><p>The NaN mask is re-applied: an output sample is NaN if any input sample
+within <code class="docutils literal notranslate"><span class="pre">+-0.5</span> <span class="pre">/</span> <span class="pre">fs_new</span></code> s of it, or one of the two input samples bracketing
+it, was NaN. Signals that are entirely NaN stay entirely NaN.</p></li>
+</ol>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>x</strong> (<em>np ndarray</em>) – shape[n_signal, n_sample], shape[n_sample] - can process multiple signals.</p></li>
-<li><p><strong>fs</strong> (<em>float</em>) – Signals fs</p></li>
-<li><p><strong>fs_new</strong> (<em>float</em>) – Downsample to fs_new</p></li>
-<li><p><strong>cutoff</strong> (<em>float</em>) – Elective cutoff freq. of anti-alias. filter. By default 2/3 of 0.5*fs_new</p></li>
-<li><p><strong>datarate</strong> (<em>bool</em>) – If return datarate of signals</p></li>
+<li><p><strong>x</strong> (<em>numpy.ndarray</em>) – <code class="docutils literal notranslate"><span class="pre">(n_samples,)</span></code> or <code class="docutils literal notranslate"><span class="pre">(n_signals,</span> <span class="pre">n_samples)</span></code> - samples along the last axis.
+Not modified.</p></li>
+<li><p><strong>fs</strong> (<em>float</em>) – Sampling frequency of <code class="docutils literal notranslate"><span class="pre">x</span></code> in Hz (<code class="docutils literal notranslate"><span class="pre">&gt;</span> <span class="pre">0</span></code>).</p></li>
+<li><p><strong>fs_new</strong> (<em>float</em>) – Target sampling frequency in Hz (<code class="docutils literal notranslate"><span class="pre">&gt;</span> <span class="pre">0</span></code>). May be lower, equal or higher
+than <code class="docutils literal notranslate"><span class="pre">fs</span></code>.</p></li>
+<li><p><strong>cutoff</strong> (<em>float</em><em>, </em><em>optional</em>) – Anti-aliasing cutoff in Hz. Default <code class="docutils literal notranslate"><span class="pre">fs_new</span> <span class="pre">/</span> <span class="pre">3</span></code> (two thirds of the new
+Nyquist frequency). When downsampling it must satisfy
+<code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">&lt;</span> <span class="pre">cutoff</span> <span class="pre">&lt;</span> <span class="pre">fs_new</span> <span class="pre">/</span> <span class="pre">2</span></code>; a higher cutoff would let content above the new
+Nyquist frequency alias into the output. When upsampling it must be <code class="docutils literal notranslate"><span class="pre">&gt;</span> <span class="pre">0</span></code>;
+if it is <code class="docutils literal notranslate"><span class="pre">&gt;=</span> <span class="pre">0.45</span> <span class="pre">*</span> <span class="pre">fs</span></code> no filter is applied.</p></li>
+<li><p><strong>datarate</strong> (<em>bool</em>) – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, also return <a class="reference internal" href="#brainmaze_utils.signal.get_datarate" title="brainmaze_utils.signal.get_datarate"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_datarate()</span></code></a> of the <strong>input</strong>.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p>numpy ndarray / tuple</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Resampled signal(s) with the same number of dimensions as <code class="docutils literal notranslate"><span class="pre">x</span></code>
+(<code class="docutils literal notranslate"><span class="pre">float64</span></code>), or <code class="docutils literal notranslate"><span class="pre">(resampled,</span> <span class="pre">datarate)</span></code> if <code class="docutils literal notranslate"><span class="pre">datarate=True</span></code>.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>numpy.ndarray or tuple</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If <code class="docutils literal notranslate"><span class="pre">fs</span></code> or <code class="docutils literal notranslate"><span class="pre">fs_new</span></code> is not positive, if <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> is outside the range
+    given above, or if <code class="docutils literal notranslate"><span class="pre">x</span></code> has more than 2 dimensions.</p>
 </dd>
 </dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">fs_new</span> <span class="pre">==</span> <span class="pre">fs</span></code> still applies the low-pass at <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> (as in v2.0.0).</p></li>
+<li><p>Upsampling: with the default cutoff the low-pass is applied only for ratios
+<code class="docutils literal notranslate"><span class="pre">fs_new</span> <span class="pre">/</span> <span class="pre">fs</span> <span class="pre">&lt;</span> <span class="pre">1.35</span></code> (where <code class="docutils literal notranslate"><span class="pre">fs_new</span> <span class="pre">/</span> <span class="pre">3</span> <span class="pre">&lt;</span> <span class="pre">0.45</span> <span class="pre">*</span> <span class="pre">fs</span></code>); v2.0.0 applied it up
+to 1.5, returned NaN between ~1.45 and 1.5 and raised above. The
+interpolator preserves content up to <code class="docutils literal notranslate"><span class="pre">0.45</span> <span class="pre">*</span> <span class="pre">fs</span></code> (or <code class="docutils literal notranslate"><span class="pre">1.25</span> <span class="pre">*</span> <span class="pre">cutoff</span></code>, if
+lower); content between <code class="docutils literal notranslate"><span class="pre">0.45</span> <span class="pre">*</span> <span class="pre">fs</span></code> and <code class="docutils literal notranslate"><span class="pre">fs</span> <span class="pre">/</span> <span class="pre">2</span></code> is attenuated. When the
+Butterworth is skipped (<code class="docutils literal notranslate"><span class="pre">cutoff</span> <span class="pre">&gt;=</span> <span class="pre">0.45</span> <span class="pre">*</span> <span class="pre">fs</span></code>) such content is not removed but
+leaves an image at <code class="docutils literal notranslate"><span class="pre">fs</span> <span class="pre">-</span> <span class="pre">f</span></code>: a tone at <code class="docutils literal notranslate"><span class="pre">0.48</span> <span class="pre">*</span> <span class="pre">fs</span></code> comes out with gain ~0.93
+plus a ~7 % image.</p></li>
+<li><p>When upsampling, <code class="docutils literal notranslate"><span class="pre">round(n</span> <span class="pre">*</span> <span class="pre">fs_new</span> <span class="pre">/</span> <span class="pre">fs)</span></code> output samples can include up to 3
+samples <strong>after</strong> the last input sample (e.g. 250-&gt;1000 Hz). They are extrapolated
+(odd extension) and are the least reliable part of the output: on a unit-amplitude
+tone their error is ~0.1 at 20 Hz and reaches ~1 for tones near 0.4 * fs. Discard
+them if the end of the record matters.</p></li>
+<li><p>Samples close to (but outside) a NaN gap are computed from the interpolated
+fill and the filter’s impulse response, so a few output samples next to a gap
+may carry a small transient; they are not masked.</p></li>
+<li><p>The record edges are extended by odd reflection over <code class="docutils literal notranslate"><span class="pre">~6</span> <span class="pre">*</span> <span class="pre">fs</span> <span class="pre">/</span> <span class="pre">cutoff</span></code>
+samples before filtering, which keeps edge transients small (~1e-3 of the
+amplitude for an in-band tone) but not zero.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Changed after v2.0.0:</strong>
+Filter is now applied in second-order sections; the previous <code class="docutils literal notranslate"><span class="pre">(b,</span> <span class="pre">a)</span></code>
+16th-order design was numerically unstable for <code class="docutils literal notranslate"><span class="pre">fs</span> <span class="pre">/</span> <span class="pre">fs_new</span> <span class="pre">&gt;=</span> <span class="pre">~10</span></code> and
+returned all-NaN output (e.g. 3000-&gt;250, 1000-&gt;50, 32000-&gt;1000 Hz). NaNs are
+now re-applied to the output instead of being silently filled. The final
+resampling step no longer uses the FFT (<code class="xref py py-func docutils literal notranslate"><span class="pre">scipy.signal.resample()</span></code>, which
+assumes a periodic signal and wraps the end of the record into its start); it
+picks samples (integer ratios) or interpolates at exact times. Upsampling by
+ratios <code class="docutils literal notranslate"><span class="pre">&gt;=</span> <span class="pre">1.5</span></code> used to raise in the filter design and now works. A
+<code class="docutils literal notranslate"><span class="pre">cutoff</span></code> at or above the new Nyquist frequency when downsampling now raises
+<code class="docutils literal notranslate"><span class="pre">ValueError</span></code> (it used to alias silently).</p>
+</div>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="brainmaze_utils.signal.detrend">
-<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.signal.</span></span><span class="sig-name descname"><span class="pre">detrend</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.signal.detrend" title="Link to this definition">#</a></dt>
-<dd><p>Detrends the input signal by removing the linear trend.</p>
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.signal.</span></span><span class="sig-name descname"><span class="pre">detrend</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y2</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'lstsq'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.signal.detrend" title="Link to this definition">#</a></dt>
+<dd><p>Remove a linear trend from a 1-D signal.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>y</strong> (<em>numpy.ndarray</em>) – The input signal to be detrended.</p></li>
-<li><p><strong>x</strong> (<em>numpy.ndarray</em><em>, </em><em>optional</em>) – The x-values corresponding to the y-values. If None, a linear space is used.</p></li>
-<li><p><strong>y2</strong> (<em>numpy.ndarray</em><em>, </em><em>optional</em>) – An additional signal to be detrended using the same trend as y.</p></li>
+<li><p><strong>y</strong> (<em>numpy.ndarray</em>) – 1-D signal to detrend.</p></li>
+<li><p><strong>x</strong> (<em>numpy.ndarray</em><em>, </em><em>optional</em>) – Abscissa of <code class="docutils literal notranslate"><span class="pre">y</span></code> (same length). Default <code class="docutils literal notranslate"><span class="pre">numpy.linspace(0,</span> <span class="pre">1,</span> <span class="pre">len(y))</span></code>.</p></li>
+<li><p><strong>y2</strong> (<em>numpy.ndarray</em><em>, </em><em>optional</em>) – Second signal (same length) from which the <strong>trend fitted on</strong> <code class="docutils literal notranslate"><span class="pre">y</span></code> is
+subtracted as well.</p></li>
+<li><p><strong>method</strong> (<em>{'lstsq'</em><em>, </em><em>'endpoints'}</em>) – <ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">'lstsq'</span></code> (default): ordinary least-squares line fitted to all finite
+samples of <code class="docutils literal notranslate"><span class="pre">y</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">'endpoints'</span></code>: the line through the first and last sample (the behaviour
+of this function before the fix); sensitive to noise on the two endpoints.</p></li>
+</ul>
+</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><ul class="simple">
-<li><p><em>numpy.ndarray</em> – The detrended signal.</p></li>
-<li><p><em>tuple of numpy.ndarray</em> – The detrended signals if y2 is provided.</p></li>
-</ul>
-</p>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">y</span> <span class="pre">-</span> <span class="pre">trend</span></code>, or <code class="docutils literal notranslate"><span class="pre">(y</span> <span class="pre">-</span> <span class="pre">trend,</span> <span class="pre">y2</span> <span class="pre">-</span> <span class="pre">trend)</span></code> if <code class="docutils literal notranslate"><span class="pre">y2</span></code> is given. NaNs in the
+inputs stay NaN; they are ignored when fitting.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>numpy.ndarray or tuple of numpy.ndarray</p>
 </dd>
 </dl>
+<p class="rubric">Notes</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Changed after v2.0.0:</strong>
+Default changed from the endpoint line to a least-squares fit. With the
+endpoint line a single noisy first/last sample tilted the whole trend (e.g.
+a +10 outlier at <code class="docutils literal notranslate"><span class="pre">y[0]</span></code> left a residual slope of ~9.7 on a slope-5 ramp).
+Use <code class="docutils literal notranslate"><span class="pre">method='endpoints'</span></code> to reproduce the old results.</p>
+</div>
 </dd></dl>
 
 <dl class="py function">
@@ -654,31 +906,93 @@ slightly due to integer window sizes.</p>
 <p class="admonition-title">Note</p>
 <p>The signal is processed in full windows. Any remaining samples at the end
 of the signal that do not form a complete window are ignored.</p>
+<p>NaN samples are ignored when searching for the min/max of a window; a window
+that is entirely NaN produces two NaN output points. (Previously a single NaN
+made both points of its window NaN.)</p>
 </div>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="brainmaze_utils.signal.fft_filter">
-<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.signal.</span></span><span class="sig-name descname"><span class="pre">fft_filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutoff</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'lp'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.signal.fft_filter" title="Link to this definition">#</a></dt>
-<dd><p>FFT filter</p>
-<p>Filters along the last axis, so a 2-D array of shape <code class="docutils literal notranslate"><span class="pre">(n_signals,</span> <span class="pre">n_samples)</span></code> is
-filtered per-signal.</p>
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.signal.</span></span><span class="sig-name descname"><span class="pre">fft_filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">X</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutoff</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'lp'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">edges</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_gap_fill</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.signal.fft_filter" title="Link to this definition">#</a></dt>
+<dd><p>Ideal (brick-wall) FFT filter. NaN-aware.</p>
+<p>The signal is transformed with an FFT along the last axis, every frequency bin on
+the rejected side of <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> is set to zero, and the result is transformed back.
+Bin frequencies are the exact DFT frequencies <code class="docutils literal notranslate"><span class="pre">k</span> <span class="pre">*</span> <span class="pre">fs</span> <span class="pre">/</span> <span class="pre">n_samples</span></code>
+(<code class="xref py py-func docutils literal notranslate"><span class="pre">numpy.fft.fftfreq()</span></code>); positive and negative frequencies are treated
+symmetrically, so the output is real.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">'lp'</span></code> keeps bins with <code class="docutils literal notranslate"><span class="pre">|f|</span> <span class="pre">&lt;=</span> <span class="pre">cutoff</span></code> (a bin exactly at <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> is kept).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">'hp'</span></code> keeps bins with <code class="docutils literal notranslate"><span class="pre">|f|</span> <span class="pre">&gt;</span> <span class="pre">cutoff</span></code> (DC is always removed by <code class="docutils literal notranslate"><span class="pre">'hp'</span></code>).</p></li>
+</ul>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>X</strong> (<em>numpy.ndarray</em>) – Signal <code class="docutils literal notranslate"><span class="pre">(n_samples,)</span></code> or a stack of signals <code class="docutils literal notranslate"><span class="pre">(...,</span> <span class="pre">n_samples)</span></code>.</p></li>
-<li><p><strong>fs</strong> (<em>float</em>)</p></li>
-<li><p><strong>cutoff</strong> (<em>float</em>)</p></li>
-<li><p><strong>type</strong> (<em>str</em>) – ‘lp’ or ‘hp’</p></li>
+<li><p><strong>X</strong> (<em>numpy.ndarray</em>) – Signal <code class="docutils literal notranslate"><span class="pre">(n_samples,)</span></code> or a stack of signals <code class="docutils literal notranslate"><span class="pre">(...,</span> <span class="pre">n_samples)</span></code>; filtered
+along the <strong>last</strong> axis. NaN marks gaps (see Notes). Not modified.</p></li>
+<li><p><strong>fs</strong> (<em>float</em>) – Sampling frequency in Hz.</p></li>
+<li><p><strong>cutoff</strong> (<em>float</em>) – Cutoff frequency in Hz (<code class="docutils literal notranslate"><span class="pre">&gt;=</span> <span class="pre">0</span></code>). A cutoff at or above Nyquist makes <code class="docutils literal notranslate"><span class="pre">'lp'</span></code>
+the identity and <code class="docutils literal notranslate"><span class="pre">'hp'</span></code> return zeros.</p></li>
+<li><p><strong>type</strong> (<em>str</em>) – <code class="docutils literal notranslate"><span class="pre">'lp'</span></code> or <code class="docutils literal notranslate"><span class="pre">'hp'</span></code>.</p></li>
+<li><p><strong>edges</strong> (<em>{None</em><em>, </em><em>'periodic'</em><em>, </em><em>'extend'}</em>) – <p>What is assumed beyond the ends of the record (and of each segment between
+gaps):</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">'periodic'</span></code>: nothing is added; the FFT treats the record as one period,
+so a mismatch between its start and end rings (Gibbs) into both edges.
+This is the v2.0.0 behaviour.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">'extend'</span></code>: the <a class="reference internal" href="#brainmaze_utils.signal.LowFrequencyFilter" title="brainmaze_utils.signal.LowFrequencyFilter"><code class="xref py py-class docutils literal notranslate"><span class="pre">LowFrequencyFilter</span></code></a> edge handling - a
+least-squares line is removed and added back to the low-pass part, and each
+end is extended by <code class="docutils literal notranslate"><span class="pre">5</span> <span class="pre">/</span> <span class="pre">cutoff</span></code> s (a local line plus the mirrored
+residual), so offset, drift and gap edges produce no jump. Falls back to
+<code class="docutils literal notranslate"><span class="pre">'periodic'</span></code> for <code class="docutils literal notranslate"><span class="pre">cutoff</span> <span class="pre">==</span> <span class="pre">0</span></code> (DC removal has no edge transient).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">None</span></code> (default): <code class="docutils literal notranslate"><span class="pre">'periodic'</span></code> if <code class="docutils literal notranslate"><span class="pre">X</span></code> contains no NaN (unchanged
+from v2.0.0), <code class="docutils literal notranslate"><span class="pre">'extend'</span></code> if it does.</p></li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>With <code class="docutils literal notranslate"><span class="pre">None</span></code> the edge handling depends on whether <code class="docutils literal notranslate"><span class="pre">X</span></code> contains
+NaN: a single NaN anywhere switches the <strong>whole</strong> output from <code class="docutils literal notranslate"><span class="pre">'periodic'</span></code>
+to <code class="docutils literal notranslate"><span class="pre">'extend'</span></code>, which changes samples far from the gap (e.g. up to ~1 for
+SD-172 1/f data, 1 Hz high-pass, 30-60 s from the NaN). Pass <code class="docutils literal notranslate"><span class="pre">edges</span></code>
+explicitly (<code class="docutils literal notranslate"><span class="pre">'extend'</span></code> is the better choice for EEG-like data) whenever
+the result must not depend on the presence of gaps.</p>
+</div>
+</p></li>
+<li><p><strong>max_gap_fill</strong> (<em>float</em><em>, </em><em>optional</em>) – Gaps shorter than this many seconds are bridged by linear interpolation;
+longer gaps split the signal into separately filtered segments. Default
+<code class="docutils literal notranslate"><span class="pre">0.5</span> <span class="pre">/</span> <span class="pre">cutoff</span></code> (<code class="docutils literal notranslate"><span class="pre">0</span></code> for <code class="docutils literal notranslate"><span class="pre">cutoff</span> <span class="pre">==</span> <span class="pre">0</span></code>). A level jump across a bridged gap
+is filtered like a real step; use a smaller value to split instead.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Same shape as <code class="docutils literal notranslate"><span class="pre">X</span></code>.</p>
+<dd class="field-even"><p>Same shape as <code class="docutils literal notranslate"><span class="pre">X</span></code> (<code class="docutils literal notranslate"><span class="pre">float64</span></code>). NaN exactly where <code class="docutils literal notranslate"><span class="pre">X</span></code> is NaN.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>numpy.ndarray</p>
 </dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If <code class="docutils literal notranslate"><span class="pre">X</span></code> contains <code class="docutils literal notranslate"><span class="pre">inf</span></code>, or for an invalid <code class="docutils literal notranslate"><span class="pre">type</span></code>, <code class="docutils literal notranslate"><span class="pre">fs</span></code>, <code class="docutils literal notranslate"><span class="pre">cutoff</span></code> or
+    <code class="docutils literal notranslate"><span class="pre">edges</span></code>.</p>
+</dd>
 </dl>
+<p class="rubric">Notes</p>
+<p>A brick-wall filter rings (Gibbs phenomenon) around sharp transients. With
+<code class="docutils literal notranslate"><span class="pre">edges='periodic'</span></code> no windowing or padding is applied.</p>
+<p><strong>Gaps (NaN).</strong> As in <a class="reference internal" href="#brainmaze_utils.signal.LowFrequencyFilter" title="brainmaze_utils.signal.LowFrequencyFilter"><code class="xref py py-class docutils literal notranslate"><span class="pre">LowFrequencyFilter</span></code></a>: interior gaps shorter than
+<code class="docutils literal notranslate"><span class="pre">max_gap_fill</span></code> are bridged linearly, filtered through and re-masked; at longer
+gaps the signal is split and each segment is filtered as if it were a complete
+record, with the chosen <code class="docutils literal notranslate"><span class="pre">edges</span></code> handling. Leading/trailing NaN are excluded.
+A level jump across a bridged gap is filtered as a real step, and a segment of only
+a few samples between long gaps gives finite but meaningless values (see
+<a class="reference internal" href="#brainmaze_utils.signal.LowFrequencyFilter" title="brainmaze_utils.signal.LowFrequencyFilter"><code class="xref py py-class docutils literal notranslate"><span class="pre">LowFrequencyFilter</span></code></a>).
+(An FFT of the whole array would spread a single NaN over the entire output.)</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Changed after v2.0.0:</strong>
+NaN input used to return an all-NaN output; gaps are now handled as above.
+<code class="docutils literal notranslate"><span class="pre">edges</span></code> and <code class="docutils literal notranslate"><span class="pre">max_gap_fill</span></code> are new; the default result for NaN-free input
+is that of v2.0.0 apart from the frequency-axis fix (see the Changes page).</p>
+</div>
 </dd></dl>
 
 <dl class="py function">
@@ -702,17 +1016,24 @@ filtered per-signal.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="brainmaze_utils.signal.get_datarate">
 <span class="sig-prename descclassname"><span class="pre">brainmaze_utils.signal.</span></span><span class="sig-name descname"><span class="pre">get_datarate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.signal.get_datarate" title="Link to this definition">#</a></dt>
-<dd><p>Calculates datarate based on NaN values</p>
+<dd><p>Fraction of valid (non-NaN) samples per signal.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><p><strong>x</strong> (<em>numpy ndarray / list</em>)</p>
+<dd class="field-odd"><p><strong>x</strong> (<em>numpy.ndarray</em><em> or </em><em>list</em><em> of </em><em>numpy.ndarray</em>) – A single signal <code class="docutils literal notranslate"><span class="pre">(n_samples,)</span></code>, a stack of signals <code class="docutils literal notranslate"><span class="pre">(n_signals,</span> <span class="pre">n_samples)</span></code>
+(samples along the <strong>last</strong> axis), or a list of 1-D signals of possibly
+different lengths.</p>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><ul class="simple">
-<li><p><em>numpy ndarray</em></p></li>
-<li><p><em>flaot values 0-1 with relative NaN count per signal.</em></p></li>
+<dd class="field-even"><p><p>Values in <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">1]</span></code>: <code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">-</span> <span class="pre">n_nan</span> <span class="pre">/</span> <span class="pre">n_samples</span></code>.</p>
+<ul class="simple">
+<li><p>1-D input -&gt; <code class="docutils literal notranslate"><span class="pre">float</span></code></p></li>
+<li><p>N-D input -&gt; <code class="docutils literal notranslate"><span class="pre">numpy.ndarray</span></code> of shape <code class="docutils literal notranslate"><span class="pre">x.shape[:-1]</span></code></p></li>
+<li><p>list input -&gt; <code class="docutils literal notranslate"><span class="pre">list</span></code> of floats (one per element)</p></li>
 </ul>
 </p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>float, numpy.ndarray or list</p>
 </dd>
 </dl>
 </dd></dl>
@@ -720,63 +1041,147 @@ filtered per-signal.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="brainmaze_utils.signal.nandecimate">
 <span class="sig-prename descclassname"><span class="pre">brainmaze_utils.signal.</span></span><span class="sig-name descname"><span class="pre">nandecimate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fs_new</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cutoff</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">datarate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.signal.nandecimate" title="Link to this definition">#</a></dt>
-<dd><p>Downsample signal with anti-aliasing filter (Butterworth - 16th order).
-Works for signals with NaN values - replaced by zero.
-Can return also data-rate. Can take matrix where signals are stacked in 0th dim.</p>
+<dd><p>Downsample signal(s) with a short FIR anti-aliasing filter. NaN-aware.</p>
+<p>Legacy, lightweight variant of <a class="reference internal" href="#brainmaze_utils.signal.decimate" title="brainmaze_utils.signal.decimate"><code class="xref py py-func docutils literal notranslate"><span class="pre">decimate()</span></code></a>: NaNs are filled with the
+channel mean, the signal is low-passed with a 30-tap FIR (<code class="docutils literal notranslate"><span class="pre">firwin</span></code>, applied
+forward-backward), resampled with <code class="xref py py-func docutils literal notranslate"><span class="pre">scipy.signal.resample()</span></code> (FFT), and the
+NaN mask is re-applied (an output sample is NaN if any input sample within
+<code class="docutils literal notranslate"><span class="pre">+-0.5</span> <span class="pre">/</span> <span class="pre">fs_new</span></code> s of it was NaN).</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>A 30-tap FIR has a wide transition band, so anti-aliasing is weak for large
+ratios <code class="docutils literal notranslate"><span class="pre">fs</span> <span class="pre">/</span> <span class="pre">fs_new</span></code>. Prefer <a class="reference internal" href="#brainmaze_utils.signal.decimate" title="brainmaze_utils.signal.decimate"><code class="xref py py-func docutils literal notranslate"><span class="pre">decimate()</span></code></a> for analysis.</p>
+</div>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>x</strong> (<em>np ndarray</em>) – shape[n_signal, n_sample], shape[n_sample] - can process multiple signals.</p></li>
-<li><p><strong>fs</strong> (<em>float</em>) – Signals fs</p></li>
-<li><p><strong>fs_new</strong> (<em>float</em>) – Downsample to fs_new</p></li>
-<li><p><strong>cutoff</strong> (<em>float</em>) – Elective cutoff freq. of anti-alias. filter. By default 2/3 of 0.5*fs_new</p></li>
-<li><p><strong>datarate</strong> (<em>bool</em>) – If return datarate of signals</p></li>
+<li><p><strong>x</strong> (<em>numpy.ndarray</em>) – <code class="docutils literal notranslate"><span class="pre">(n_samples,)</span></code> or <code class="docutils literal notranslate"><span class="pre">(n_signals,</span> <span class="pre">n_samples)</span></code> - samples along the last axis.
+Not modified.</p></li>
+<li><p><strong>fs</strong> (<em>float</em>) – Sampling frequency of <code class="docutils literal notranslate"><span class="pre">x</span></code> in Hz.</p></li>
+<li><p><strong>fs_new</strong> (<em>float</em>) – Target sampling frequency in Hz.</p></li>
+<li><p><strong>cutoff</strong> (<em>float</em><em>, </em><em>optional</em>) – FIR cutoff in Hz. Default <code class="docutils literal notranslate"><span class="pre">fs_new</span> <span class="pre">/</span> <span class="pre">3</span></code>.</p></li>
+<li><p><strong>datarate</strong> (<em>bool</em>) – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, also return <a class="reference internal" href="#brainmaze_utils.signal.get_datarate" title="brainmaze_utils.signal.get_datarate"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_datarate()</span></code></a> of the <strong>input</strong>.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p>numpy ndarray / tuple</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Decimated signal(s) (<code class="docutils literal notranslate"><span class="pre">round(n_samples</span> <span class="pre">*</span> <span class="pre">fs_new</span> <span class="pre">/</span> <span class="pre">fs)</span></code> samples), or
+<code class="docutils literal notranslate"><span class="pre">(decimated,</span> <span class="pre">datarate)</span></code> if <code class="docutils literal notranslate"><span class="pre">datarate=True</span></code>.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>numpy.ndarray or tuple</p>
 </dd>
 </dl>
+<p class="rubric">Notes</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Changed after v2.0.0:</strong>
+NaNs were previously filled with the NaN <em>fraction</em> of the channel (a value
+in [0, 1]) instead of the channel mean, producing large spurious transients
+next to every gap for signals with a DC offset.</p>
+</div>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="brainmaze_utils.signal.resample">
 <span class="sig-prename descclassname"><span class="pre">brainmaze_utils.signal.</span></span><span class="sig-name descname"><span class="pre">resample</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fsamp_orig</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fsamp_new</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.signal.resample" title="Link to this definition">#</a></dt>
-<dd><p>Resample a signal from an old sampling frequency to a new sampling frequency. Works with nans.</p>
+<dd><p>Resample a signal to a new sampling frequency by linear interpolation. NaN-aware.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>No anti-aliasing filter is applied - by design.</strong> <code class="docutils literal notranslate"><span class="pre">resample</span></code> only
+interpolates. When downsampling, any content above the new Nyquist frequency
+<code class="docutils literal notranslate"><span class="pre">fsamp_new</span> <span class="pre">/</span> <span class="pre">2</span></code> folds back (aliases) into the output: e.g. a 400 Hz tone
+resampled 1000 -&gt; 250 Hz appears as a full-amplitude 100 Hz tone. Band-limiting
+the signal is deliberately left to the caller, who knows which band matters.
+Before downsampling, low-pass below <code class="docutils literal notranslate"><span class="pre">fsamp_new</span> <span class="pre">/</span> <span class="pre">2</span></code> (with margin), or use
+<a class="reference internal" href="#brainmaze_utils.signal.decimate" title="brainmaze_utils.signal.decimate"><code class="xref py py-func docutils literal notranslate"><span class="pre">decimate()</span></code></a>, which filters and downsamples in one step.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">scipy.signal</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">ss</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">brainmaze_utils.signal</span><span class="w"> </span><span class="kn">import</span> <span class="n">resample</span><span class="p">,</span> <span class="n">decimate</span>
+
+<span class="n">fs</span><span class="p">,</span> <span class="n">fs_new</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span> <span class="mi">250</span>
+<span class="c1"># option 1: your own zero-phase low-pass, then resample</span>
+<span class="n">sos</span> <span class="o">=</span> <span class="n">ss</span><span class="o">.</span><span class="n">butter</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mf">0.8</span> <span class="o">*</span> <span class="n">fs_new</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span> <span class="s1">'lp'</span><span class="p">,</span> <span class="n">fs</span><span class="o">=</span><span class="n">fs</span><span class="p">,</span> <span class="n">output</span><span class="o">=</span><span class="s1">'sos'</span><span class="p">)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">resample</span><span class="p">(</span><span class="n">ss</span><span class="o">.</span><span class="n">sosfiltfilt</span><span class="p">(</span><span class="n">sos</span><span class="p">,</span> <span class="n">x</span><span class="p">),</span> <span class="n">fs</span><span class="p">,</span> <span class="n">fs_new</span><span class="p">)</span>  <span class="c1"># x must be NaN-free here</span>
+<span class="c1"># option 2: decimate (anti-aliasing filter included, NaN-aware)</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">decimate</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">fs</span><span class="p">,</span> <span class="n">fs_new</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Upsampling (<code class="docutils literal notranslate"><span class="pre">fsamp_new</span> <span class="pre">&gt;</span> <span class="pre">fsamp_orig</span></code>) does not need a filter; linear
+interpolation slightly attenuates content close to the original Nyquist.</p>
+</div>
+<p>Sample <code class="docutils literal notranslate"><span class="pre">i</span></code> of the input is at time <code class="docutils literal notranslate"><span class="pre">i</span> <span class="pre">/</span> <span class="pre">fsamp_orig</span></code> and sample <code class="docutils literal notranslate"><span class="pre">k</span></code> of the
+output at <code class="docutils literal notranslate"><span class="pre">k</span> <span class="pre">/</span> <span class="pre">fsamp_new</span></code> (both starting at 0); the output has
+<code class="docutils literal notranslate"><span class="pre">round(n_samples</span> <span class="pre">*</span> <span class="pre">fsamp_new</span> <span class="pre">/</span> <span class="pre">fsamp_orig)</span></code> samples. Each output value is the
+linear interpolation between the two input samples that bracket its time.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>x</strong> (<em>numpy.ndarray</em>) – The input signal to be resampled.</p></li>
-<li><p><strong>fsamp_orig</strong> (<em>float</em>) – The original sampling frequency of the signal.</p></li>
-<li><p><strong>fsamp_new</strong> (<em>float</em>) – The new sampling frequency to resample the signal to.</p></li>
+<li><p><strong>x</strong> (<em>numpy.ndarray</em>) – <code class="docutils literal notranslate"><span class="pre">(n_samples,)</span></code> or <code class="docutils literal notranslate"><span class="pre">(...,</span> <span class="pre">n_samples)</span></code> - resampled along the last axis.
+Not modified.</p></li>
+<li><p><strong>fsamp_orig</strong> (<em>float</em>) – Sampling frequency of <code class="docutils literal notranslate"><span class="pre">x</span></code> in Hz.</p></li>
+<li><p><strong>fsamp_new</strong> (<em>float</em>) – Target sampling frequency in Hz.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>The resampled signal.</p>
+<dd class="field-even"><p>Resampled signal (<code class="docutils literal notranslate"><span class="pre">float64</span></code>). If <code class="docutils literal notranslate"><span class="pre">fsamp_orig</span> <span class="pre">==</span> <span class="pre">fsamp_new</span></code> a float copy
+of <code class="docutils literal notranslate"><span class="pre">x</span></code> is returned.</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p>numpy.ndarray</p>
 </dd>
 </dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>NaN handling: an output sample is NaN if either bracketing input sample is NaN
+(an output time that coincides with an input sample uses only that sample).
+Values are never interpolated across a gap. <strong>When downsampling, short gaps can
+disappear:</strong> a gap that falls entirely between two output instants marks no
+output sample (e.g. a 3-sample gap, 1000 -&gt; 250 Hz, gives no NaN at all). Use
+<a class="reference internal" href="#brainmaze_utils.signal.decimate" title="brainmaze_utils.signal.decimate"><code class="xref py py-func docutils literal notranslate"><span class="pre">decimate()</span></code></a> if the gap mask must be preserved (it flags every output
+sample within half an output period of a NaN).</p></li>
+<li><p>Empty input (or an output of 0 samples) returns an empty array of shape
+<code class="docutils literal notranslate"><span class="pre">x.shape[:-1]</span> <span class="pre">+</span> <span class="pre">(n_new,)</span></code>.</p></li>
+<li><p>Output times beyond the last input sample (possible when upsampling) take the
+last input value.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Changed after v2.0.0:</strong>
+Time axes were <code class="docutils literal notranslate"><span class="pre">linspace(0,</span> <span class="pre">1,</span> <span class="pre">N)</span></code> / <code class="docutils literal notranslate"><span class="pre">linspace(0,</span> <span class="pre">1,</span> <span class="pre">N_new)</span></code>, which pins
+both endpoints and stretched time: the effective output rate was
+<code class="docutils literal notranslate"><span class="pre">(N_new</span> <span class="pre">-</span> <span class="pre">1)</span> <span class="pre">/</span> <span class="pre">(N</span> <span class="pre">-</span> <span class="pre">1)</span> <span class="pre">*</span> <span class="pre">fs</span></code> rather than <code class="docutils literal notranslate"><span class="pre">fsamp_new</span></code>. Also fixed
+<code class="docutils literal notranslate"><span class="pre">np.NaN</span></code> (removed in NumPy 2) and division by zero for constant signals.</p>
+</div>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="brainmaze_utils.signal.unify_sampling_frequency">
 <span class="sig-prename descclassname"><span class="pre">brainmaze_utils.signal.</span></span><span class="sig-name descname"><span class="pre">unify_sampling_frequency</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sampling_frequency</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fs_new</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span></span></span><a class="headerlink" href="#brainmaze_utils.signal.unify_sampling_frequency" title="Link to this definition">#</a></dt>
-<dd><p>Takes list of signals and list of frequencies and downsamples to the same sampling frequency.
-If all frequencies are same and fs_new is not specified, no operation performed. If not all frequencies are the same
-and fs_new is not specified, downsamples all signals on the lowest fs present in the list. If fs_new is specified,
-signals will be processed and downsampled on that frequency. If all sampling frequencies == fs_new, nothing is performed.</p>
+<dd><p>Bring a list of signals to a common sampling frequency using <a class="reference internal" href="#brainmaze_utils.signal.decimate" title="brainmaze_utils.signal.decimate"><code class="xref py py-func docutils literal notranslate"><span class="pre">decimate()</span></code></a>.</p>
+<ul class="simple">
+<li><p>If all frequencies are equal and <code class="docutils literal notranslate"><span class="pre">fs_new</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code>: nothing is done.</p></li>
+<li><p>If frequencies differ and <code class="docutils literal notranslate"><span class="pre">fs_new</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code>: all signals are decimated to
+the lowest frequency present.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">fs_new</span></code> is given: every signal whose frequency differs from <code class="docutils literal notranslate"><span class="pre">fs_new</span></code> is
+resampled to <code class="docutils literal notranslate"><span class="pre">fs_new</span></code> with <a class="reference internal" href="#brainmaze_utils.signal.decimate" title="brainmaze_utils.signal.decimate"><code class="xref py py-func docutils literal notranslate"><span class="pre">decimate()</span></code></a>, which downsamples <strong>or upsamples</strong>
+(e.g. a 150 Hz channel brought to <code class="docutils literal notranslate"><span class="pre">fs_new=200</span></code>).</p></li>
+</ul>
+<p>Signals already at the target frequency are passed through unchanged (they are
+<strong>not</strong> low-passed).</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>x</strong> (<em>list</em>) – list of numpy signals for downsampling</p></li>
-<li><p><strong>sampling_frequency</strong> (<em>list</em>) – for each signal</p></li>
-<li><p><strong>fs_new</strong> (<em>float</em>) – new sampling frequency</p></li>
+<li><p><strong>x</strong> (<em>list</em><em> of </em><em>numpy.ndarray</em>) – Signals (1-D, or 2-D with samples along the last axis).</p></li>
+<li><p><strong>sampling_frequency</strong> (<em>list</em><em> or </em><em>numpy.ndarray</em>) – Sampling frequency in Hz of each signal.</p></li>
+<li><p><strong>fs_new</strong> (<em>float</em><em>, </em><em>optional</em>) – Target sampling frequency in Hz. Signals below it are upsampled, signals
+above it are low-passed (<code class="docutils literal notranslate"><span class="pre">fs_new</span> <span class="pre">/</span> <span class="pre">3</span></code>) and downsampled.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p>tuple - (numpy ndarray, new_freq)</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">(list</span> <span class="pre">of</span> <span class="pre">numpy.ndarray,</span> <span class="pre">fs_new)</span></code>. A <strong>new</strong> list is returned; the input list
+and its arrays are not modified.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
 </dd>
 </dl>
 </dd></dl>

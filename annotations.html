@@ -48,6 +48,7 @@
     <link rel="icon" href="_static/brainmaze_173x173.png"/>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Changes" href="changes.html" />
     <link rel="prev" title="Gaps (NaN handling)" href="gaps.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -136,6 +137,10 @@
   
 
   
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
 </div>
 
     </header>
@@ -214,6 +219,7 @@
 <li class="toctree-l1"><a class="reference internal" href="vector.html">Vector</a></li>
 <li class="toctree-l1"><a class="reference internal" href="gaps.html">Gaps (NaN handling)</a></li>
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">Annotations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changes.html">Changes</a></li>
 </ul>
 
     </div>
@@ -358,7 +364,9 @@
 <button class="btn btn-sm pst-navbar-icon search-button search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
     <i class="fa-solid fa-magnifying-glass fa-lg"></i>
 </button>
-
+<button class="sidebar-toggle secondary-toggle btn btn-sm pst-navbar-icon" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
 </div></div>
       
     </div>
@@ -374,6 +382,26 @@
     <div id="print-main-content">
         <div id="jb-print-toc">
             
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.create_day_indexes"><code class="docutils literal notranslate"><span class="pre">create_day_indexes()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.create_duration"><code class="docutils literal notranslate"><span class="pre">create_duration()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.filter_by_duration"><code class="docutils literal notranslate"><span class="pre">filter_by_duration()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.filter_by_key"><code class="docutils literal notranslate"><span class="pre">filter_by_key()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.load_CyberPSG"><code class="docutils literal notranslate"><span class="pre">load_CyberPSG()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.load_NSRR"><code class="docutils literal notranslate"><span class="pre">load_NSRR()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.merge_annotations"><code class="docutils literal notranslate"><span class="pre">merge_annotations()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.save_CyberPSG"><code class="docutils literal notranslate"><span class="pre">save_CyberPSG()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.tile_annotations"><code class="docutils literal notranslate"><span class="pre">tile_annotations()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.time_to_local"><code class="docutils literal notranslate"><span class="pre">time_to_local()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.time_to_timestamp"><code class="docutils literal notranslate"><span class="pre">time_to_timestamp()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.time_to_timezone"><code class="docutils literal notranslate"><span class="pre">time_to_timezone()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.time_to_utc"><code class="docutils literal notranslate"><span class="pre">time_to_utc()</span></code></a></li>
+</ul>
+            </nav>
         </div>
     </div>
 </div>
@@ -383,8 +411,304 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="annotations">
-<h1>Annotations<a class="headerlink" href="#annotations" title="Link to this heading">#</a></h1>
+  <section id="module-brainmaze_utils.annotations">
+<span id="annotations"></span><h1>Annotations<a class="headerlink" href="#module-brainmaze_utils.annotations" title="Link to this heading">#</a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.annotations.create_day_indexes">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.annotations.</span></span><span class="sig-name descname"><span class="pre">create_day_indexes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hour</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">12</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tzinfo</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.annotations.create_day_indexes" title="Link to this definition">#</a></dt>
+<dd><p>Add a <code class="docutils literal notranslate"><span class="pre">day</span></code> column: an integer day index for each epoch, where days are cut at
+the given wall-clock <code class="docutils literal notranslate"><span class="pre">hour</span></code> (default noon, so one night falls within one day).</p>
+<p>The index of an epoch is the number of calendar “days” (<code class="docutils literal notranslate"><span class="pre">hour</span></code> to <code class="docutils literal notranslate"><span class="pre">hour</span></code>)
+between the day containing the earliest epoch’s start and the day containing
+its own start; the earliest epoch is day 0. Day boundaries are computed on the
+local wall clock of the chosen timezone, so DST transitions are handled.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<em>pandas.DataFrame</em>) – Annotations with a <code class="docutils literal notranslate"><span class="pre">start</span></code> column (and <code class="docutils literal notranslate"><span class="pre">end</span></code>). <code class="docutils literal notranslate"><span class="pre">start</span></code> can be POSIX
+timestamps in seconds (int/float) or timezone-aware <code class="docutils literal notranslate"><span class="pre">datetime</span></code>/<code class="docutils literal notranslate"><span class="pre">Timestamp</span></code>
+values (all in the same timezone).</p></li>
+<li><p><strong>hour</strong> (<em>int</em><em> or </em><em>float</em>) – Hour of day (<code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">&lt;=</span> <span class="pre">hour</span> <span class="pre">&lt;</span> <span class="pre">24</span></code>, fractions allowed) at which days are split.</p></li>
+<li><p><strong>tzinfo</strong> (<em>datetime.tzinfo</em><em>, </em><em>optional</em>) – <p>Timezone whose wall clock defines the day boundaries. Default: the timezone of
+the data if <code class="docutils literal notranslate"><span class="pre">start</span></code> is timezone-aware, otherwise the machine’s local
+timezone (<code class="xref py py-func docutils literal notranslate"><span class="pre">dateutil.tz.tzlocal()</span></code>).</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>For <strong>UTC</strong> data (e.g. the output of <code class="docutils literal notranslate"><span class="pre">load_CyberPSG</span></code>) the default cuts
+days at <code class="docutils literal notranslate"><span class="pre">hour</span></code> <strong>UTC</strong>: noon UTC is 6 or 7 AM in Chicago and 1 or 2 PM in
+Prague, not local noon. Pass the recording site’s timezone, e.g.
+<code class="docutils literal notranslate"><span class="pre">tzinfo=dateutil.tz.gettz('America/Chicago')</span></code>, to cut at local <code class="docutils literal notranslate"><span class="pre">hour</span></code>.
+(Same as v2.0.0.)</p>
+</div>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A copy of <code class="docutils literal notranslate"><span class="pre">df</span></code> <strong>sorted by start</strong> (index reset) with an integer <code class="docutils literal notranslate"><span class="pre">day</span></code>
+column. <code class="docutils literal notranslate"><span class="pre">start</span></code>/<code class="docutils literal notranslate"><span class="pre">end</span></code> are returned unchanged.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pandas.DataFrame</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Changed after v2.0.0:</strong>
+Rewritten. The previous implementation assigned via chained indexing, which is
+a silent no-op under pandas copy-on-write (pandas &gt;= 3: every epoch got day 0),
+could miss the last day, and ignored the <code class="docutils literal notranslate"><span class="pre">tzinfo</span></code> argument.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.annotations.create_duration">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.annotations.</span></span><span class="sig-name descname"><span class="pre">create_duration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dfHyp</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.annotations.create_duration" title="Link to this definition">#</a></dt>
+<dd><p>Add a <code class="docutils literal notranslate"><span class="pre">duration</span></code> column (<code class="docutils literal notranslate"><span class="pre">end</span> <span class="pre">-</span> <span class="pre">start</span></code> in seconds).</p>
+<p>Works for numeric timestamps and for timezone-aware datetimes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A <strong>copy</strong> with the <code class="docutils literal notranslate"><span class="pre">duration</span></code> column; the input frame is not modified.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>pandas.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.annotations.filter_by_duration">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.annotations.</span></span><span class="sig-name descname"><span class="pre">filter_by_duration</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dfAnnotations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">duration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.annotations.filter_by_duration" title="Link to this definition">#</a></dt>
+<dd><p>Keeps only epochs of the duration given by the input.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.annotations.filter_by_key">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.annotations.</span></span><span class="sig-name descname"><span class="pre">filter_by_key</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dfAnnotations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.annotations.filter_by_key" title="Link to this definition">#</a></dt>
+<dd><p>Removes annotations whose <code class="docutils literal notranslate"><span class="pre">key</span></code> column equals <code class="docutils literal notranslate"><span class="pre">value</span></code>, keeping all others.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This <em>drops</em> the rows matching <code class="docutils literal notranslate"><span class="pre">value</span></code> (the inverse of what the name may suggest);
+e.g. <code class="docutils literal notranslate"><span class="pre">filter_by_key(df,</span> <span class="pre">'annotation',</span> <span class="pre">'Arrousal')</span></code> returns the frame with arousals
+removed.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.annotations.load_CyberPSG">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.annotations.</span></span><span class="sig-name descname"><span class="pre">load_CyberPSG</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tile</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">strip_suffixes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.annotations.load_CyberPSG" title="Link to this definition">#</a></dt>
+<dd><p>Load annotations from CyberPSG XML file(s).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em><em> or </em><em>list</em>) – Path to CyberPSG XML file or list of paths for multiple files</p></li>
+<li><p><strong>tile</strong> (<em>float</em><em>, </em><em>optional</em>) – Time duration in seconds to tile annotations into fixed-length segments</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, display progress bar for multiple files (default: True)</p></li>
+<li><p><strong>strip_suffixes</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True (default), one of the suffixes <code class="docutils literal notranslate"><span class="pre">_bm</span></code> (written by
+<a class="reference internal" href="#brainmaze_utils.annotations.save_CyberPSG" title="brainmaze_utils.annotations.save_CyberPSG"><code class="xref py py-func docutils literal notranslate"><span class="pre">save_CyberPSG()</span></code></a>), <code class="docutils literal notranslate"><span class="pre">_best</span></code> (written by v2.0.0 and earlier), <code class="docutils literal notranslate"><span class="pre">_aisc</span></code> or
+<code class="docutils literal notranslate"><span class="pre">_PiesPro</span></code> is removed from every label, so files written by any version load
+to the same label set (<code class="docutils literal notranslate"><span class="pre">N2_bm</span></code>, <code class="docutils literal notranslate"><span class="pre">N2_best</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">N2</span></code>). Set to False to get the
+names exactly as stored, e.g. to tell a scorer’s <code class="docutils literal notranslate"><span class="pre">N2</span></code> from a model’s
+<code class="docutils literal notranslate"><span class="pre">N2_best</span></code> in the same file (with True both load as <code class="docutils literal notranslate"><span class="pre">N2</span></code>).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>DataFrame with annotation columns (annotation, start, end, duration, and
+<code class="docutils literal notranslate"><span class="pre">channel</span></code> for channel annotations) or list of DataFrames if multiple paths
+provided. <code class="docutils literal notranslate"><span class="pre">start</span></code>/<code class="docutils literal notranslate"><span class="pre">end</span></code> are timezone-aware UTC datetimes; fractional
+seconds beyond microseconds (.NET writes 7 digits) are truncated.
+Label suffixes are handled as described for <code class="docutils literal notranslate"><span class="pre">strip_suffixes</span></code>.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pandas.DataFrame or list</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Changed after v2.0.0:</strong>
+<code class="docutils literal notranslate"><span class="pre">_bm</span></code> and <code class="docutils literal notranslate"><span class="pre">_best</span></code> are stripped as well (v2.0.0 stripped only <code class="docutils literal notranslate"><span class="pre">_aisc</span></code> and
+<code class="docutils literal notranslate"><span class="pre">_PiesPro</span></code>, so its own files loaded as <code class="docutils literal notranslate"><span class="pre">N2_best</span></code>, <code class="docutils literal notranslate"><span class="pre">IED_best</span></code>, …).</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.annotations.load_NSRR">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.annotations.</span></span><span class="sig-name descname"><span class="pre">load_NSRR</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.annotations.load_NSRR" title="Link to this definition">#</a></dt>
+<dd><p>Load sleep stage annotations from NSRR (National Sleep Research Resource) XML file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>path</strong> (<em>str</em>) – Path to NSRR XML annotation file</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>DataFrame with sleep stage annotations</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pandas.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.annotations.merge_annotations">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.annotations.</span></span><span class="sig-name descname"><span class="pre">merge_annotations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.annotations.merge_annotations" title="Link to this definition">#</a></dt>
+<dd><p>Merge epochs with the same annotation that touch in time (<code class="docutils literal notranslate"><span class="pre">end</span> <span class="pre">==</span> <span class="pre">start</span></code> of the
+next one). Reverse of <a class="reference internal" href="#brainmaze_utils.annotations.tile_annotations" title="brainmaze_utils.annotations.tile_annotations"><code class="xref py py-func docutils literal notranslate"><span class="pre">tile_annotations()</span></code></a>.</p>
+<p>Epochs are grouped by <code class="docutils literal notranslate"><span class="pre">annotation</span></code> and by the values of every extra column
+(e.g. <code class="docutils literal notranslate"><span class="pre">channel</span></code>; missing values - None, NaN, <code class="docutils literal notranslate"><span class="pre">pd.NA</span></code> - are equal to each
+other). Within a group, epochs are sorted by <code class="docutils literal notranslate"><span class="pre">start</span></code> and chains of touching
+epochs are merged; the merged epoch keeps the group’s values. Epochs of other
+groups in between (e.g. interleaved channels, or an overlapping label from a
+second scorer) do not prevent merging. A <code class="docutils literal notranslate"><span class="pre">duration</span></code> column, if present, is
+recomputed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>df</strong> (<em>pd.DataFrame</em>) – DataFrame with numeric (timestamp) ‘start’, ‘end’ and
+‘annotation’ columns, optionally more.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>merged annotations sorted by <code class="docutils literal notranslate"><span class="pre">start</span></code> (stable), columns
+<code class="docutils literal notranslate"><span class="pre">start,</span> <span class="pre">end,</span> <span class="pre">annotation</span></code>, then the extra columns in their original order
+(dtypes kept), then <code class="docutils literal notranslate"><span class="pre">duration</span></code> if it was present. The input frame is not
+modified.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Changed after v2.0.0:</strong>
+v2.0.0 merged only rows that were consecutive in the input order, dropped
+every extra column and raised on some of them. Now the frame is grouped as
+described above, so unsorted input, interleaved channels and overlapping
+labels merge as well; for sorted, non-overlapping single-channel input the
+result is the same as before.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.annotations.save_CyberPSG">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.annotations.</span></span><span class="sig-name descname"><span class="pre">save_CyberPSG</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">df</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.annotations.save_CyberPSG" title="Link to this definition">#</a></dt>
+<dd><p>Save annotations to CyberPSG XML file format.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>) – Output path for the CyberPSG XML file</p></li>
+<li><p><strong>df</strong> (<em>pandas.DataFrame</em>) – DataFrame containing annotations with columns: annotation, start, end
+Optional column: channel (for channel-specific annotations)</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Label names on disk: standard labels (<code class="docutils literal notranslate"><span class="pre">AWAKE,</span> <span class="pre">N1,</span> <span class="pre">N2,</span> <span class="pre">N3,</span> <span class="pre">REM,</span> <span class="pre">UNKNOWN,</span> <span class="pre">Arousal,</span>
+<span class="pre">N,</span> <span class="pre">SLP,</span> <span class="pre">IED,</span> <span class="pre">seizure,</span> <span class="pre">seizure_05,</span> <span class="pre">seizure_08</span></code>) are written with the suffix
+<code class="docutils literal notranslate"><span class="pre">_bm</span></code> (<code class="docutils literal notranslate"><span class="pre">'N2'</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">'N2_bm'</span></code>), with exactly the type UUIDs that v2.0.0 wrote
+for them (v2.0.0 wrote <code class="docutils literal notranslate"><span class="pre">'N2_best'</span></code>, same UUID). Input labels <code class="docutils literal notranslate"><span class="pre">'N2_best'</span></code> or
+<code class="docutils literal notranslate"><span class="pre">'N2_bm'</span></code> are the same type as <code class="docutils literal notranslate"><span class="pre">'N2'</span></code>. Every other label is written as given.
+<a class="reference internal" href="#brainmaze_utils.annotations.load_CyberPSG" title="brainmaze_utils.annotations.load_CyberPSG"><code class="xref py py-func docutils literal notranslate"><span class="pre">load_CyberPSG()</span></code></a> strips <code class="docutils literal notranslate"><span class="pre">_bm</span></code> and <code class="docutils literal notranslate"><span class="pre">_best</span></code>, so
+<code class="docutils literal notranslate"><span class="pre">load_CyberPSG(save_CyberPSG(df))</span></code> returns the labels of <code class="docutils literal notranslate"><span class="pre">df</span></code> (with any
+<code class="docutils literal notranslate"><span class="pre">_best</span></code>/<code class="docutils literal notranslate"><span class="pre">_bm</span></code> suffix removed), and files written by v2.0.0 load to the same
+labels. Times are written in UTC with microsecond precision. <code class="docutils literal notranslate"><span class="pre">df</span></code> is not
+modified.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Changed after v2.0.0:</strong>
+The suffix written to standard labels is <code class="docutils literal notranslate"><span class="pre">_bm</span></code> instead of <code class="docutils literal notranslate"><span class="pre">_best</span></code>. Type
+UUIDs are unchanged. <code class="docutils literal notranslate"><span class="pre">'N2'</span></code> and <code class="docutils literal notranslate"><span class="pre">'N2_best'</span></code> in the same frame no longer
+raise (they are one type).</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.annotations.tile_annotations">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.annotations.</span></span><span class="sig-name descname"><span class="pre">tile_annotations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dur_threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">30</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.annotations.tile_annotations" title="Link to this definition">#</a></dt>
+<dd><p>Optimized tile_annotations using vectorized operations.
+Tiles epochs to the max duration given by dur_threshold in seconds. Reverse to the ‘merge annotations’.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<em>pd.DataFrame</em>) – DataFrame with numeric (timestamp) ‘start’, ‘end’, and
+‘annotation’ columns representing merged annotations. Extra columns
+(e.g. ‘channel’) are allowed and copied to every tile of their epoch.</p></li>
+<li><p><strong>dur_threshold</strong> (<em>int</em>) – The desired size of each chunk in seconds.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>DataFrame with tiled annotations (<code class="docutils literal notranslate"><span class="pre">start,</span> <span class="pre">end,</span> <span class="pre">annotation</span></code>,
+extra columns, then <code class="docutils literal notranslate"><span class="pre">duration</span></code> if present in the input).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.annotations.time_to_local">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.annotations.</span></span><span class="sig-name descname"><span class="pre">time_to_local</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dfHyp</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.annotations.time_to_local" title="Link to this definition">#</a></dt>
+<dd><p>Convert <code class="docutils literal notranslate"><span class="pre">start</span></code>/<code class="docutils literal notranslate"><span class="pre">end</span></code> to timezone-aware datetimes in the machine’s local
+timezone (<code class="xref py py-func docutils literal notranslate"><span class="pre">dateutil.tz.tzlocal()</span></code>).</p>
+<p>Accepted inputs per cell: POSIX timestamps in seconds (int/float) or
+timezone-aware <code class="docutils literal notranslate"><span class="pre">datetime</span></code>/<code class="docutils literal notranslate"><span class="pre">Timestamp</span></code> (naive datetimes raise).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A <strong>copy</strong>; the input frame is not modified.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>pandas.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.annotations.time_to_timestamp">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.annotations.</span></span><span class="sig-name descname"><span class="pre">time_to_timestamp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dfHyp</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.annotations.time_to_timestamp" title="Link to this definition">#</a></dt>
+<dd><p>Convert <code class="docutils literal notranslate"><span class="pre">start</span></code>/<code class="docutils literal notranslate"><span class="pre">end</span></code> to POSIX timestamps in seconds (float).</p>
+<p>Accepted inputs per cell: timezone-aware <code class="docutils literal notranslate"><span class="pre">datetime</span></code>/<code class="docutils literal notranslate"><span class="pre">Timestamp</span></code> or numbers
+(passed through).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A <strong>copy</strong>; the input frame is not modified.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>pandas.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.annotations.time_to_timezone">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.annotations.</span></span><span class="sig-name descname"><span class="pre">time_to_timezone</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dfHyp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tzinfo</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.annotations.time_to_timezone" title="Link to this definition">#</a></dt>
+<dd><p>Convert <code class="docutils literal notranslate"><span class="pre">start</span></code>/<code class="docutils literal notranslate"><span class="pre">end</span></code> to timezone-aware datetimes in <code class="docutils literal notranslate"><span class="pre">tzinfo</span></code>
+(a <code class="docutils literal notranslate"><span class="pre">datetime.tzinfo</span></code>, e.g. from <code class="xref py py-mod docutils literal notranslate"><span class="pre">dateutil.tz</span></code>).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A <strong>copy</strong>; the input frame is not modified.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>pandas.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.annotations.time_to_utc">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.annotations.</span></span><span class="sig-name descname"><span class="pre">time_to_utc</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dfHyp</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.annotations.time_to_utc" title="Link to this definition">#</a></dt>
+<dd><p>Convert <code class="docutils literal notranslate"><span class="pre">start</span></code>/<code class="docutils literal notranslate"><span class="pre">end</span></code> to timezone-aware UTC datetimes.</p>
+<p>Accepted inputs per cell: POSIX timestamps in seconds (int/float) or
+timezone-aware <code class="docutils literal notranslate"><span class="pre">datetime</span></code>/<code class="docutils literal notranslate"><span class="pre">Timestamp</span></code> (naive datetimes raise).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A <strong>copy</strong>; the input frame is not modified.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>pandas.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
 </section>
 
 
@@ -407,12 +731,50 @@
         <p class="prev-next-title">Gaps (NaN handling)</p>
       </div>
     </a>
+    <a class="right-next"
+       href="changes.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Changes</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
 </div>
                 </footer>
               
             </div>
             
             
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item"><div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.create_day_indexes"><code class="docutils literal notranslate"><span class="pre">create_day_indexes()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.create_duration"><code class="docutils literal notranslate"><span class="pre">create_duration()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.filter_by_duration"><code class="docutils literal notranslate"><span class="pre">filter_by_duration()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.filter_by_key"><code class="docutils literal notranslate"><span class="pre">filter_by_key()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.load_CyberPSG"><code class="docutils literal notranslate"><span class="pre">load_CyberPSG()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.load_NSRR"><code class="docutils literal notranslate"><span class="pre">load_NSRR()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.merge_annotations"><code class="docutils literal notranslate"><span class="pre">merge_annotations()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.save_CyberPSG"><code class="docutils literal notranslate"><span class="pre">save_CyberPSG()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.tile_annotations"><code class="docutils literal notranslate"><span class="pre">tile_annotations()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.time_to_local"><code class="docutils literal notranslate"><span class="pre">time_to_local()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.time_to_timestamp"><code class="docutils literal notranslate"><span class="pre">time_to_timestamp()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.time_to_timezone"><code class="docutils literal notranslate"><span class="pre">time_to_timezone()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.annotations.time_to_utc"><code class="docutils literal notranslate"><span class="pre">time_to_utc()</span></code></a></li>
+</ul>
+  </nav></div>
+
+</div></div>
               
             
           </div>
