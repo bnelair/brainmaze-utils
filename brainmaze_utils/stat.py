@@ -73,6 +73,8 @@ def combine_mvgauss_distributions(mu1, var1, N1, mu2, var2, N2):
     var_combined : numpy.ndarray
         Pooled ``(d, d)`` covariance (symmetric).
 
+    Notes
+    -----
     .. note:: **Changed after v2.0.0:**
        The between-group term used the element-wise square ``(mu2 - mu1)**2``
        instead of the outer product, so off-diagonal (cross-covariance) terms were
@@ -116,6 +118,8 @@ def kl_divergence_nonparametric(pk, qk, eps=None):
     float
         ``sum(p * log(p / q))``, ``>= 0``; ``inf`` as described above.
 
+    Notes
+    -----
     .. note:: **Changed after v2.0.0:**
        Bins with ``q == 0, p > 0`` were silently dropped (returning e.g. 0.0 instead
        of inf) and the inputs were not normalised.

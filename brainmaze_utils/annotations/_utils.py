@@ -329,6 +329,8 @@ def create_day_indexes(df: pd.DataFrame, hour: Union[int, float]=12, tzinfo=None
         A copy of ``df`` **sorted by start** (index reset) with an integer ``day``
         column. ``start``/``end`` are returned unchanged.
 
+    Notes
+    -----
     .. note:: **Changed after v2.0.0:**
        Rewritten. The previous implementation assigned via chained indexing, which is
        a silent no-op under pandas copy-on-write (pandas >= 3: every epoch got day 0),

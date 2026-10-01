@@ -306,6 +306,8 @@ def nandecimate(x, fs, fs_new, cutoff=None, datarate=False):
         Decimated signal(s) (``round(n_samples * fs_new / fs)`` samples), or
         ``(decimated, datarate)`` if ``datarate=True``.
 
+    Notes
+    -----
     .. note:: **Changed after v2.0.0:**
        NaNs were previously filled with the NaN *fraction* of the channel (a value
        in [0, 1]) instead of the channel mean, producing large spurious transients
@@ -1030,6 +1032,8 @@ def detrend(y, x=None, y2=None, method='lstsq'):
         ``y - trend``, or ``(y - trend, y2 - trend)`` if ``y2`` is given. NaNs in the
         inputs stay NaN; they are ignored when fitting.
 
+    Notes
+    -----
     .. note:: **Changed after v2.0.0:**
        Default changed from the endpoint line to a least-squares fit. With the
        endpoint line a single noisy first/last sample tilted the whole trend (e.g.

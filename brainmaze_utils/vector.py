@@ -36,6 +36,8 @@ def translate(x, m):
         Translated vectors as a **new** array; ``x`` is not modified. The dtype is
         promoted as needed (an integer ``x`` translated by ``0.5`` gives floats).
 
+    Notes
+    -----
     .. note:: **Changed after v2.0.0:**
        Previously ``x`` was modified in place and the result kept ``x``'s dtype, so
        integer input silently truncated fractional offsets.
