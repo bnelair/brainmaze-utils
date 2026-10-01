@@ -137,8 +137,8 @@ already produced false detections; 0.1 s also matches the default post-filter ma
 synthetic backgrounds (probes and tables in brainmaze-utils PR #26):
 
 - band RMS of the fill / band RMS of the neighbouring data, median over gaps, 0.5 Hz to
-  1 kHz: ``'spectral'`` 0.93-1.07 for 2-60 s gaps and 0.84-0.99 for 1 s gaps (real),
-  0.88-1.05 for 1-60 s gaps at 5 kHz; pooled over 39 gaps of stationary synthetic
+  1 kHz: ``'spectral'`` 0.96-1.07 for 2-60 s gaps and 0.84-0.99 for 1 s gaps (real),
+  0.88-1.04 for 1-60 s gaps at 5 kHz; pooled over 39 gaps of stationary synthetic
   data 0.81-1.19 also for 0.15-0.5 s gaps. In 0.2-0.5 s gaps the delta band (0.5-4 Hz)
   of real EEG is under-filled (0.57-0.76; frequencies below ~1/gap cannot be represented).
   ``'pink'``: 1.4-3.2 in 4-200 Hz on real data and about 5-7 in 80-1000 Hz at 5 kHz,
