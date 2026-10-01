@@ -1,0 +1,930 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Gaps (NaN handling) &#8212; BrainMaze: A Toolbox to Analyze Brain Electrophysiology, Behavior and Dynamics - Utils</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=90905a2f556bf617f1a9" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=90905a2f556bf617f1a9" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=4418a689" />
+  
+  <!-- So that users can add custom icons -->
+  <script defer src="_static/scripts/fontawesome.js?digest=90905a2f556bf617f1a9"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=90905a2f556bf617f1a9" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=90905a2f556bf617f1a9" />
+
+    <script src="_static/documentation_options.js?v=ce394494"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <script src="_static/scripts/sphinx-book-theme.js?v=fab101a9"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'gaps';</script>
+    <script>DOCUMENTATION_OPTIONS.search_as_you_type = false;</script>
+    <link rel="icon" href="_static/brainmaze_173x173.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Annotations" href="annotations.html" />
+    <link rel="prev" title="Vector" href="vector.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="2.0.0" />
+  
+    
+    <script src="_static/searchtools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <script src="searchindex.js"></script>
+  
+  </head>
+  <body data-default-mode="">
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+  
+  
+  
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search..."
+         aria-label="Search..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header id="pst-header" class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/brainmaze_1757x1762.png" class="logo__image only-light" alt="BrainMaze: A Toolbox to Analyze Brain Electrophysiology, Behavior and Dynamics - Utils - Home"/>
+    <img src="_static/brainmaze_1757x1762.png" class="logo__image only-dark pst-js-only" alt="BrainMaze: A Toolbox to Analyze Brain Electrophysiology, Behavior and Dynamics - Utils - Home"/>
+  
+  
+</a></div>
+        <div class="sidebar-primary-item">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button></div>
+        <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
+    <div class="bd-toc-item navbar-nav active">
+        
+        <ul class="nav bd-sidenav bd-sidenav__home-link">
+            <li class="toctree-l1">
+                <a class="reference internal" href="index.html">
+                    BrainMaze - Utils
+                </a>
+            </li>
+        </ul>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">BrainMaze - Python Packages</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="brainmaze_ext.html">BrainMaze</a></li>
+<li class="toctree-l1"><a class="reference internal" href="brainmaze_eeg_ext.html">BrainMaze - EEG</a></li>
+<li class="toctree-l1"><a class="reference internal" href="brainmaze_utils_ext.html">BrainMaze - Utils</a></li>
+<li class="toctree-l1"><a class="reference internal" href="brainmaze_zmq_ext.html">BrainMaze - ZMQ</a></li>
+</ul>
+<p aria-level="2" class="caption" role="heading"><span class="caption-text">BrainMaze Utils - Modules</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="files.html">Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="signal.html">Signal</a></li>
+<li class="toctree-l1"><a class="reference internal" href="stat.html">Stats</a></li>
+<li class="toctree-l1"><a class="reference internal" href="types.html">Types</a></li>
+<li class="toctree-l1"><a class="reference internal" href="vector.html">Vector</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Gaps (NaN handling)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="annotations.html">Annotations</a></li>
+</ul>
+
+    </div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+
+<div class="sbt-scroll-pixel-helper"></div>
+
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item"><button class="sidebar-toggle primary-toggle btn btn-sm" title="Toggle primary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <span class="fa-solid fa-bars"></span>
+</button></div>
+      
+    </div>
+  
+  
+    <div class="header-article-items__end">
+      
+        <div class="header-article-item">
+
+<div class="article-header-buttons">
+
+
+<a href="https://github.com/bnelair/brainmaze_utils" target="_blank"
+   class="btn btn-sm btn-source-repository-button"
+   title="Source repository"
+   data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fab fa-github"></i>
+  </span>
+
+</a>
+
+
+
+
+
+
+<div class="dropdown dropdown-download-buttons">
+  <button class="btn dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Download this page">
+    <i class="fas fa-download"></i>
+  </button>
+  <ul class="dropdown-menu">
+      
+      
+      
+      <li><a href="_sources/gaps.rst" target="_blank"
+   class="btn btn-sm btn-download-source-button dropdown-item"
+   title="Download source file"
+   data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file"></i>
+  </span>
+<span class="btn__text-container">.rst</span>
+</a>
+</li>
+      
+      
+      
+      
+      <li>
+<button onclick="window.print()"
+  class="btn btn-sm btn-download-pdf-button dropdown-item"
+  title="Print to PDF"
+  data-bs-placement="left" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-file-pdf"></i>
+  </span>
+<span class="btn__text-container">.pdf</span>
+</button>
+</li>
+      
+  </ul>
+</div>
+
+
+
+
+<button onclick="toggleFullScreen()"
+  class="btn btn-sm btn-fullscreen-button pst-navbar-icon"
+  title="Fullscreen mode"
+  data-bs-placement="bottom" data-bs-toggle="tooltip"
+>
+  
+
+<span class="btn__icon-container">
+  <i class="fas fa-expand"></i>
+  </span>
+
+</button>
+
+
+
+<div class="theme-switch-container dropdown pst-js-only" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Color mode">
+  <button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button dropdown-toggle" aria-label="Color mode" data-bs-toggle="dropdown">
+    <i class="theme-switch fa-solid fa-sun fa-lg fa-fw" data-mode="light" title="Light"></i>
+    <i class="theme-switch fa-solid fa-moon fa-lg fa-fw" data-mode="dark" title="Dark"></i>
+    <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg fa-fw" data-mode="auto" title="System Settings"></i>
+  </button>
+  <ul class="dropdown-menu dropdown-menu-end">
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="auto"><i class="fa-solid fa-circle-half-stroke fa-lg fa-fw me-1"></i>System Settings</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="light"><i class="fa-solid fa-sun fa-lg fa-fw me-1"></i>Light</button></li>
+    <li><button class="dropdown-item d-flex align-items-center theme-change-button" data-mode="dark"><i class="fa-solid fa-moon fa-lg fa-fw me-1"></i>Dark</button></li>
+  </ul>
+</div>
+
+
+<button class="btn btn-sm pst-navbar-icon search-button search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <i class="fa-solid fa-magnifying-glass fa-lg"></i>
+</button>
+<button class="sidebar-toggle secondary-toggle btn btn-sm pst-navbar-icon" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
+</div></div>
+      
+    </div>
+  
+</div>
+</div>
+              
+              
+
+<div id="jb-print-docs-body" class="onlyprint">
+    <h1>Gaps (NaN handling)</h1>
+    <!-- Table of contents -->
+    <div id="print-main-content">
+        <div id="jb-print-toc">
+            
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#recommended-pipeline">Recommended pipeline</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-fill-at-all">Why fill at all</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#fill-methods">Fill methods</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#edges">Edges</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#units-post-filters">Units (post-filters)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#randomness">Randomness</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#montages-bipolar-car-derive-first-then-fill">Montages (bipolar, CAR): derive first, then fill</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#defaults-and-the-evidence-behind-them">Defaults and the evidence behind them</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#release">Release</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#limitations">Limitations</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.gaps.drop_in_gaps"><code class="docutils literal notranslate"><span class="pre">drop_in_gaps()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.gaps.fill_gaps"><code class="docutils literal notranslate"><span class="pre">fill_gaps()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.gaps.find_gaps"><code class="docutils literal notranslate"><span class="pre">find_gaps()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.gaps.gap_intervals"><code class="docutils literal notranslate"><span class="pre">gap_intervals()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.gaps.mask_in_gaps"><code class="docutils literal notranslate"><span class="pre">mask_in_gaps()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.gaps.pink_noise"><code class="docutils literal notranslate"><span class="pre">pink_noise()</span></code></a></li>
+</ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="module-brainmaze_utils.gaps">
+<span id="gaps-nan-handling"></span><h1>Gaps (NaN handling)<a class="headerlink" href="#module-brainmaze_utils.gaps" title="Link to this heading">#</a></h1>
+<p>Gap (NaN / inf) handling for detectors: find gaps, fill them before detection, and remove
+detections that fall in or near them afterwards.</p>
+<section id="recommended-pipeline">
+<h2>Recommended pipeline<a class="headerlink" href="#recommended-pipeline" title="Link to this heading">#</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">brainmaze_utils.gaps</span><span class="w"> </span><span class="kn">import</span> <span class="n">find_gaps</span><span class="p">,</span> <span class="n">fill_gaps</span><span class="p">,</span> <span class="n">drop_in_gaps</span>
+
+<span class="n">gaps</span> <span class="o">=</span> <span class="n">find_gaps</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>                       <span class="c1"># 1. on the ORIGINAL signal: (n_gaps, 2) samples</span>
+<span class="n">y</span> <span class="o">=</span> <span class="n">fill_gaps</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">fs</span><span class="p">)</span>                      <span class="c1"># 2. finite copy, same shape and float dtype</span>
+<span class="n">det</span> <span class="o">=</span> <span class="n">my_detector</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">fs</span><span class="p">)</span>                  <span class="c1"># 3. any detector (here: sample indices)</span>
+<span class="n">det</span> <span class="o">=</span> <span class="n">drop_in_gaps</span><span class="p">(</span><span class="n">det</span><span class="p">,</span> <span class="n">gaps</span><span class="p">,</span> <span class="n">fs</span><span class="p">,</span>         <span class="c1"># 4. ALWAYS drop detections in / near gaps</span>
+                   <span class="n">units</span><span class="o">=</span><span class="s1">'samples'</span><span class="p">,</span>       <span class="c1">#    units of det (and end)</span>
+                   <span class="n">gap_units</span><span class="o">=</span><span class="s1">'samples'</span><span class="p">,</span>   <span class="c1">#    units of gaps (find_gaps: samples)</span>
+                   <span class="n">margin_s</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Step 4 is not optional: whatever fills a gap is not data, and an event detected there (or
+straddling a gap edge) is meaningless. Use the gaps found on the original signal; the
+filled signal has none.</p>
+<p>For N-D input, <code class="docutils literal notranslate"><span class="pre">fill_gaps</span></code> fills every channel along <code class="docutils literal notranslate"><span class="pre">axis</span></code> in one call; <code class="docutils literal notranslate"><span class="pre">find_gaps</span></code>
+and the post-filters work per channel (1-D), e.g. <code class="docutils literal notranslate"><span class="pre">gaps</span> <span class="pre">=</span> <span class="pre">[find_gaps(x[ch])</span> <span class="pre">for</span> <span class="pre">ch</span> <span class="pre">...]</span></code>.</p>
+</section>
+<section id="why-fill-at-all">
+<h2>Why fill at all<a class="headerlink" href="#why-fill-at-all" title="Link to this heading">#</a></h2>
+<p>Most filters (IIR <code class="docutils literal notranslate"><span class="pre">filtfilt</span></code>, FFT, Hilbert) spread a single NaN or inf over the whole
+signal, so a detector run on raw gappy data silently returns nothing. Background-modelling
+detectors (Janca, RMS/HFO detectors, …) additionally estimate a running background from
+the signal: a gap filled with zeros or a straight line lowers that background for several
+seconds around the gap and produces bursts of false detections there; a fill with too
+much power in the detector’s band raises it and hides real events next to the gap; and a
+hard step or kink at a gap edge rings through every filter. The fill therefore has to
+<em>look like the neighbouring background</em> (same level, same power in every band) and must
+join the data the way the data joins itself.</p>
+</section>
+<section id="fill-methods">
+<h2>Fill methods<a class="headerlink" href="#fill-methods" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><strong>Short gaps</strong> (<code class="docutils literal notranslate"><span class="pre">&lt;=</span> <span class="pre">max_interp_s</span></code>, default 0.1 s), and every gap with
+<code class="docutils literal notranslate"><span class="pre">method='linear'</span></code>: linear interpolation between the two edge samples (constant
+extension for a gap at the start or end). All short gaps are filled in one vectorised
+step, so packet-loss-like recordings with thousands of tiny gaps are cheap.</p></li>
+<li><p><strong>Long gaps</strong>, <code class="docutils literal notranslate"><span class="pre">method='spectral'</span></code> (<strong>default</strong>): noise with the <em>power spectrum of
+the neighbouring data</em>, conditioned on the samples at the gap edges (see “Edges”).
+The spectrum is a Welch estimate (Hann window, half-overlapping segments) from up to
+<code class="docutils literal notranslate"><span class="pre">context_s</span></code> of data on each side. The segment is the gap length rounded up to a
+power of two, but at least ~1 s (so the delta band is in the spectrum) and at most
+~8 s (0.12 Hz resolution for long gaps, so a 0.75 Hz slow oscillation is not smeared
+into 1-4 Hz) and at most half the context. Only segments made of <em>original</em> samples
+are used when there are at least three (interpolated short gaps and earlier fills have
+no high-frequency power); with dense packet loss the spectrum above <code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">fs</span> <span class="pre">/</span> <span class="pre">k</span></code> comes
+from the longest original-only segments (length k). The estimate is robust to spikes
+and artifacts in the context: a segment is dropped when its log power exceeds the
+median over segments by more than max(3 MAD, log 2) in at least two of four log-spaced
+bands (spikes, pops and movement are broadband), or by more than max(5 MAD, log 16) in
+any one band; the remaining segments are averaged. Physiological bursts (spindles,
+alpha/beta bursts) raise one band by less than that and are kept. Every frequency bin
+of the fill gets exactly the power that the context has there (random phase), so the
+fill matches the neighbours band by band (the 1/f slope, alpha or other peaks, the
+white noise floor) rather than only in total RMS. It rides on the local level (median
+of the 0.5 s next to each edge, linearly bridged across the gap).</p></li>
+<li><p><strong>Long gaps</strong>, <code class="docutils literal notranslate"><span class="pre">method='pink'</span></code>: 1/f^``beta`` noise (from <code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">/</span> <span class="pre">gap</span></code> up) scaled to
+the robust (MAD) amplitude of the context, on the same level bridge and with the same
+edge conditioning. The spectral <em>shape</em> is fixed, so its band powers generally differ
+from the data (see below), and so does its roughness at the junctions; kept for
+comparison and for data that really is 1/f^beta.</p></li>
+<li><p><strong>Long gaps</strong>, <code class="docutils literal notranslate"><span class="pre">method='mirror'</span></code>: the neighbouring signal mirrored into the gap from
+both sides, the two images cross-faded over the whole gap with an amplitude correction
+that accounts for the measured correlation of the two images, plus a 10 ms point
+reflection blend at each edge. Keeps the local spectrum, but copies real neighbouring
+events (e.g. a spike next to the gap) into the gap.</p></li>
+</ul>
+</section>
+<section id="edges">
+<h2>Edges<a class="headerlink" href="#edges" title="Link to this heading">#</a></h2>
+<p>For <code class="docutils literal notranslate"><span class="pre">'spectral'</span></code> and <code class="docutils literal notranslate"><span class="pre">'pink'</span></code> the noise is a <strong>conditional simulation</strong> of the
+Gaussian process with that spectrum, given ~20 ms (4-64 samples) of data on each side of
+the gap (kriging with the autocovariance of the same spectrum). The fill therefore
+continues the data exactly as far as the data’s own autocorrelation reaches: a smooth
+signal keeps its value and slope, an oscillation keeps its phase into the gap, and white
+noise carries nothing over (no low-frequency bump from one noisy edge sample). The
+variance is right everywhere, so the band power neither dips nor bulges at the edges, and
+the junction is statistically like the data’s own sample-to-sample steps. Edge residuals
+larger than 4 robust SD of the neighbouring data (e.g. an artifact cut by the dropout)
+are clipped before conditioning, so an artifact at the edge is not continued into the
+gap. The same clip applies to a large <em>real</em> event (e.g. a 300 uV K-complex or a 400 uV
+spike) that the gap cuts: the fill then starts from the clipped value, which leaves a
+step at the junction (K-complex: junction step 42x the median absolute sample
+difference, 10-60 Hz envelope 12.6x vs 2.2 gap-free; without the clip 1.2-1.9x). The
+step is confined to +-0.1 s of the edge, which the default <code class="docutils literal notranslate"><span class="pre">drop_in_gaps</span></code> margin
+(<code class="docutils literal notranslate"><span class="pre">margin_s=0.1</span></code>) covers; do not use a smaller margin if such events occur. <code class="docutils literal notranslate"><span class="pre">taper_s</span></code> (default 0.5 s) bounds how far into the gap the conditioning acts (the
+whole gap if it is shorter than <code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">*</span> <span class="pre">taper_s</span></code>; faded out over the second half of
+<code class="docutils literal notranslate"><span class="pre">taper_s</span></code>). <code class="docutils literal notranslate"><span class="pre">taper_s=0</span></code> gives unconditioned noise with a step at each edge.</p>
+</section>
+<section id="units-post-filters">
+<h2>Units (post-filters)<a class="headerlink" href="#units-post-filters" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">mask_in_gaps</span></code> / <code class="docutils literal notranslate"><span class="pre">drop_in_gaps</span></code> take <strong>two required</strong> keywords: <code class="docutils literal notranslate"><span class="pre">units</span></code> for the
+detections (and <code class="docutils literal notranslate"><span class="pre">end</span></code>) and <code class="docutils literal notranslate"><span class="pre">gap_units</span></code> for the gaps, each <code class="docutils literal notranslate"><span class="pre">'seconds'</span></code> or
+<code class="docutils literal notranslate"><span class="pre">'samples'</span></code>; <code class="docutils literal notranslate"><span class="pre">margin_s</span></code> is always in seconds and <code class="docutils literal notranslate"><span class="pre">fs</span></code> is always required. Gaps from
+<a class="reference internal" href="#brainmaze_utils.gaps.find_gaps" title="brainmaze_utils.gaps.find_gaps"><code class="xref py py-func docutils literal notranslate"><span class="pre">find_gaps()</span></code></a> are sample indices, from <a class="reference internal" href="#brainmaze_utils.gaps.gap_intervals" title="brainmaze_utils.gaps.gap_intervals"><code class="xref py py-func docutils literal notranslate"><span class="pre">gap_intervals()</span></code></a> seconds; detections are
+whatever your detector returns (e.g. eeg_forge’s Janca returns sample indices). Because
+each side is stated separately, detections in samples work against gaps in seconds (and
+vice versa) without conversion, and a units mix-up cannot hide behind one shared keyword.
+Integer-typed values with <code class="docutils literal notranslate"><span class="pre">'seconds'</span></code> raise (sample indices declared as seconds; pass
+genuine whole seconds as floats), and non-integral values with <code class="docutils literal notranslate"><span class="pre">'samples'</span></code> raise
+(floats within 1e-6 of an integer, such as <code class="docutils literal notranslate"><span class="pre">t</span> <span class="pre">*</span> <span class="pre">fs</span></code>, are accepted).</p>
+</section>
+<section id="randomness">
+<h2>Randomness<a class="headerlink" href="#randomness" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">seed</span></code> (default 0) may be an int, a sequence of ints, <code class="docutils literal notranslate"><span class="pre">None</span></code> (fresh entropy), a
+<code class="xref py py-class docutils literal notranslate"><span class="pre">numpy.random.SeedSequence</span></code> or a <code class="xref py py-class docutils literal notranslate"><span class="pre">numpy.random.Generator</span></code>. The noise of
+every long gap is drawn from its own stream derived from the seed, the gap’s length and a
+hash of the context data next to it, <strong>quantised to 1/1000 of its robust SD</strong> around its
+median. Consequently:</p>
+<ul class="simple">
+<li><p>a channel’s fill does not depend on other channels, their gaps or their order, nor on
+the other gaps of the same channel (as long as they are outside its context);</p></li>
+<li><p>the same channel gives the same fill in a 1-D call and inside an N-D call;</p></li>
+<li><p>the fill is the same across machines and numpy/scipy versions, and after upstream
+processing that differs at the rounding (ulp) level; for data rescaled (uV vs V) or
+and for the same gap at another array offset (segment-wise processing), as long as the
+context is the same. Data that differ by more than about 1/1000 SD give a different,
+independent realisation. A float32 cast of real data is <strong>not</strong> guaranteed to give the
+same fill (the rounding of ~6e-8 relative can cross a 1/1000 SD quantisation boundary:
+5 of 20 real segments changed, 20 of 20 were unchanged for uV -&gt; V or 1e-9 relative
+noise); fill in one dtype throughout if bit-reproducibility across dtypes matters;</p></li>
+<li><p>different channels sharing a gap (recording-wide dropouts) get <strong>independent</strong> noise,
+also when they are filled one at a time in separate calls with the same seed, so the
+fills are not spuriously identical. (Two channels whose context data are equal up to
+scale get identical fills.) <strong>This does not make montages safe</strong>, see “Montages” below.</p></li>
+</ul>
+</section>
+<section id="montages-bipolar-car-derive-first-then-fill">
+<h2>Montages (bipolar, CAR): derive first, then fill<a class="headerlink" href="#montages-bipolar-car-derive-first-then-fill" title="Link to this heading">#</a></h2>
+<p>Derive the montage (bipolar, common average, …) from the raw channels <strong>first</strong> and fill
+the derived signal afterwards. Filling the referential channels and then deriving
+subtracts independent noise realisations from channels that are strongly correlated in
+the real data (the real common part cancels, the independent fills add), which inflates
+the gap in the derived signal 5-22x in RMS (two referential channels with correlation
+0.962: 5.2x; 0.998: 21.6x) and raises the Janca threshold 1.22x (p90 1.38) up to 2.5 s
+<em>outside</em> the gap (0.995 correlation). Deriving first and then filling gives 1.01-1.04
+(gap RMS 1.01-1.02). Gaps of the derived signal are the union of the channels’ gaps
+(non-finite samples propagate through the subtraction), so find the gaps on the derived
+signal.</p>
+</section>
+<section id="defaults-and-the-evidence-behind-them">
+<h2>Defaults and the evidence behind them<a class="headerlink" href="#defaults-and-the-evidence-behind-them" title="Link to this heading">#</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">max_interp_s=0.1</span></code>: in the Janca detection benchmark (1 h scalp EEG, 500 Hz) gaps
+<code class="docutils literal notranslate"><span class="pre">&lt;=</span> <span class="pre">0.05</span> <span class="pre">s</span></code> made no difference for any method, while straight lines over 0.5 s gaps
+already produced false detections; 0.1 s also matches the default post-filter margin.</p>
+<p><code class="docutils literal notranslate"><span class="pre">method='spectral'</span></code>: measured on real Fz-Cz EEG (500 Hz, 20-40 gaps per length) and on
+synthetic backgrounds (probes and tables in brainmaze-utils PR #26):</p>
+<ul class="simple">
+<li><p>band RMS of the fill / band RMS of the neighbouring data, median over gaps, 0.5 Hz to
+1 kHz: <code class="docutils literal notranslate"><span class="pre">'spectral'</span></code> 0.96-1.07 for 2-60 s gaps and 0.84-0.99 for 1 s gaps (real),
+0.88-1.04 for 1-60 s gaps at 5 kHz; pooled over 39 gaps of stationary synthetic
+data 0.81-1.19 also for 0.15-0.5 s gaps. In 0.2-0.5 s gaps the delta band (0.5-4 Hz)
+of real EEG is under-filled (0.57-0.76; frequencies below ~1/gap cannot be represented).
+<code class="docutils literal notranslate"><span class="pre">'pink'</span></code>: 1.4-3.2 in 4-200 Hz on real data and about 5-7 in 80-1000 Hz at 5 kHz,
+because its 1/f shape is fixed;</p></li>
+<li><p>slow oscillation (0.75 Hz) + white noise, 30 s gaps: 0.6-1 Hz 0.94, 1-2 Hz 1.5, 2-4 Hz
+0.99 (with the former ~1 s Welch segment: 0.38 / 6.7 / 7.7);</p></li>
+<li><p>noisy (white-dominated) edges, 5 s gaps: 1-4 Hz power in the first 0.5 s of the fill
+1.65x the original, the same as unconditioned noise (the former one-sample point
+reflection: 181x); 1-4 Hz difference in the valid data 0.1-1 s before the gap 0.50
+band-SD median (point reflection: 6.1);</p></li>
+<li><p>a 300 uV artifact cut by the dropout: max <code class="docutils literal notranslate"><span class="pre">|fill</span> <span class="pre">-</span> <span class="pre">level|</span></code> in the first 0.5 s 3.7 SD
+(point reflection: 19.9 SD, <code class="docutils literal notranslate"><span class="pre">'mirror'</span></code>: 10.7 SD); junctions on real EEG are
+statistically like the data’s own (2nd difference p90 3.2-3.8 vs 3.4 for the data);</p></li>
+<li><p>an RMS (80-500 Hz, 10 s window) background threshold in the <em>valid</em> data 0.1-4 s
+outside a gap, filled / gap-free: <code class="docutils literal notranslate"><span class="pre">'spectral'</span></code> 1.00 and <code class="docutils literal notranslate"><span class="pre">'mirror'</span></code> 0.99-1.00 for
+0.5, 2 and 10 s gaps; <code class="docutils literal notranslate"><span class="pre">'pink'</span></code> 1.69 / 2.67 / 2.94, i.e. an RMS-threshold detector
+misses real events next to a pink-filled gap;</p></li>
+<li><p>eeg_forge’s Janca threshold 0.1-2.5 s outside a gap, filled / gap-free (0.2-60 s gaps):
+<code class="docutils literal notranslate"><span class="pre">'spectral'</span></code> median 0.99-1.01, p90 &lt;= 1.09; <code class="docutils literal notranslate"><span class="pre">'mirror'</span></code> p90 &lt;= 1.04;
+<code class="docutils literal notranslate"><span class="pre">'pink'</span></code> p90 up to 1.23;</p></li>
+<li><p>Janca detections (1 h, 23 gaps per length, 0.5-60 s, transients injected 0.15-1.2 s
+outside both edges, <code class="docutils literal notranslate"><span class="pre">drop_in_gaps</span></code> margin 0.1 s): no false detections near the gaps
+for <code class="docutils literal notranslate"><span class="pre">'spectral'</span></code> or <code class="docutils literal notranslate"><span class="pre">'mirror'</span></code> (<code class="docutils literal notranslate"><span class="pre">'linear'</span></code>: 12-415). With strong transients both
+find 100 %. With weak ones (near the threshold) the sensitivity at 0.15 s from the
+edge is 0.74-0.91 gap-free, 0.72-0.85 with <code class="docutils literal notranslate"><span class="pre">'spectral'</span></code> and 0.41-0.78 with
+<code class="docutils literal notranslate"><span class="pre">'mirror'</span></code> (it copies the transients into the gap, raising the background).</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">'spectral'</span></code> is the default because it is the only fill that keeps the background of
+the neighbouring data in every band without copying neighbouring events (spikes,
+artifacts) into the gap; its Welch estimate also rejects such events in the context.
+<code class="docutils literal notranslate"><span class="pre">context_s=30</span></code>: room for the 8 s Welch segments of long gaps (&gt;= 3 per side; with 10 s
+the slow-oscillation test above gave 1-2 Hz 3.3x); shorter gaps use about 16 gap lengths
+(at least three ~1 s segments) per side, so the cost scales with the gap.
+<code class="docutils literal notranslate"><span class="pre">taper_s=0.5</span></code>: covers the autocorrelation of typical EEG; the conditioning is exact
+within it.</p>
+</section>
+<section id="release">
+<h2>Release<a class="headerlink" href="#release" title="Link to this heading">#</a></h2>
+<p>This module is new in brainmaze-utils 3.0.0 (a major release because numerical results of
+filled signals change); the version itself is bumped by the release workflow.</p>
+</section>
+<section id="limitations">
+<h2>Limitations<a class="headerlink" href="#limitations" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>At very high packet loss (&gt;= 75 %, islands of valid data shorter than 16 samples) the
+fill underestimates the spectrum: 8-30 Hz 0.26-0.83 and 30-240 Hz 0.44-1.03 of the
+original (10-50 % loss: 0.99-1.00).</p></li>
+<li><p>Dense large slow-oscillation or K-complex trains next to short gaps: their cycles are
+rejected as artifacts by the Welch rule, so the fill is slightly too weak (1 s gaps:
+11-15 Hz 0.83-0.89, 30-60 Hz 0.90-0.92 vs 0.96-1.01 without rejection; 5-30 s gaps
+0.93-1.02).</p></li>
+<li><p>The fill is stationary noise: it does not reproduce oscillatory bursts, spikes, sleep
+spindles or other non-stationary structure, nor the phase relations between channels
+(each channel is filled independently; derive bipolar/CAR montages before filling). Do not compute features that depend on the
+content of the gap (event rates, coherence, phase) without excluding the gaps.</p></li>
+<li><p>Bursty rhythms are filled at their <em>average</em> power: with the two-band rejection rule
+the burst band of the fill is 0.94-1.04 of the context for spindles and alpha/beta
+bursts (it was 0.62-0.91 with a one-band rule). The price: a single narrow-band
+artifact below 16x is kept (0.3 s, 600 uV movement artifacts every 5 s next to a 1 s
+gap: 1-4 Hz 1.24x of the clean background instead of 1.10x; spikes in the context are
+still rejected: 10-60 Hz 0.98-1.04, 1.7x without rejection).</p></li>
+<li><p>For gaps &gt;= ~4 s the Welch segments are 8 s long; artifacts that recur more often than
+that are in every segment and cannot be rejected: the movement artifacts above give
+1-4 Hz 3.5x next to a 5 s gap (10-60 Hz unaffected, 0.99).</p></li>
+<li><p>The spectrum is estimated from at most <code class="docutils literal notranslate"><span class="pre">context_s</span></code> on each side; if the state changes
+across the gap the fill uses the average of both sides. With fewer than 16 valid
+context samples the fill falls back to <code class="docutils literal notranslate"><span class="pre">'pink'</span></code> scaled by the MAD of what is there.</p></li>
+<li><p>Frequencies below about <code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">/</span> <span class="pre">segment</span></code> (0.12-1 Hz) are represented only by the level
+bridge and the edge conditioning; the fill has no infra-slow drift. A strong narrow
+peak (a 0.75 Hz slow oscillation) still leaks ~1.5x into the neighbouring band.</p></li>
+<li><p>Remove line noise before filling: in the shortest long gaps (&lt;= ~0.15 s) the line in
+the fill is not phase-locked to the data and passes a notch (40 uV 50 Hz, eeg_forge
+Janca 10-60 Hz band with a 50 Hz notch: 2.4x in 0.13 s gaps, 0.94-1.04 in 0.2-1 s
+gaps, where the conditioning keeps the line’s phase).</p></li>
+<li><p>With dense packet loss (no ~1 s stretch of original data) the spectrum below
+<code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">fs</span> <span class="pre">/</span> <span class="pre">k</span></code> (see above) comes from segments that include interpolated samples and is
+biased low.</p></li>
+<li><p>A detector’s background estimate <em>straddling</em> a gap is still partly made of fill, so the
+post-filter margin should cover the detector’s own edge sensitivity (default 0.1 s;
+increase it for detectors with long filters or windows).</p></li>
+<li><p>Short gaps are linear: continuous in value but not in slope. A slope-matching (cubic)
+interpolation would extrapolate sample-to-sample noise over the gap; the kink is
+covered by the post-filter margin.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">'mirror'</span></code> corrects its cross-fade amplitude with the <em>broadband</em> correlation of the
+two mirror images; a narrow-band coherent component such as line noise can still come
+out ~1.1-1.3x too strong in short gaps (it was up to 1.5x without the correction).</p></li>
+<li><p>Cost: a long gap at 32 kHz takes ~0.5 s per minute of gap (10 min: ~5 s) and
+allocates ~5.6-5.8x the gap length in float64 temporaries (30 min at 32 kHz: ~2.5 GiB);
+medium gaps (0.1-0.5 s) at 32 kHz take ~25-55 ms each (1500 of 0.12 s in 10 min:
+~40 s). Fill very long gaps at a lower rate, or split the recording.</p></li>
+<li><p>A channel that is entirely NaN/inf cannot be filled; see <code class="docutils literal notranslate"><span class="pre">all_nan</span></code>.</p></li>
+</ul>
+</section>
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.gaps.drop_in_gaps">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.gaps.</span></span><span class="sig-name descname"><span class="pre">drop_in_gaps</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">det</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gaps</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fs</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">units</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gap_units</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">margin_s</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.gaps.drop_in_gaps" title="Link to this definition">#</a></dt>
+<dd><p>Remove the detections flagged by <a class="reference internal" href="#brainmaze_utils.gaps.mask_in_gaps" title="brainmaze_utils.gaps.mask_in_gaps"><code class="xref py py-func docutils literal notranslate"><span class="pre">mask_in_gaps()</span></code></a> (same arguments).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The kept detections (and interval ends), with their original dtype.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>np.ndarray, or tuple <code class="docutils literal notranslate"><span class="pre">(det,</span> <span class="pre">end)</span></code> when <code class="docutils literal notranslate"><span class="pre">end</span></code> is given</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.gaps.fill_gaps">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.gaps.</span></span><span class="sig-name descname"><span class="pre">fill_gaps</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fs</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_interp_s</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'spectral'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">context_s</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">30.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">taper_s</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beta</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">axis</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">all_nan</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'keep'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">copy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.gaps.fill_gaps" title="Link to this definition">#</a></dt>
+<dd><p>Fill NaN/inf gaps so a detector can run on the signal (see the module docstring for
+the pipeline, the methods and the evidence behind the defaults).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (<em>array_like</em>) – Signal, 1-D <code class="docutils literal notranslate"><span class="pre">(n_samples,)</span></code> or N-D with time along <code class="docutils literal notranslate"><span class="pre">axis</span></code>. Non-finite samples
+(NaN, +inf, -inf) are gaps.</p></li>
+<li><p><strong>fs</strong> (<em>float</em>) – Sampling frequency (Hz).</p></li>
+<li><p><strong>max_interp_s</strong> (<em>float</em>) – Gaps up to this length (seconds) are linearly interpolated; longer gaps use
+<code class="docutils literal notranslate"><span class="pre">method</span></code>. Default 0.1 s.</p></li>
+<li><p><strong>method</strong> (<em>{'spectral'</em><em>, </em><em>'pink'</em><em>, </em><em>'mirror'</em><em>, </em><em>'linear'}</em>) – Fill for long gaps. <code class="docutils literal notranslate"><span class="pre">'spectral'</span></code> (default): noise with the band powers (robust
+Welch PSD) of the neighbouring data. <code class="docutils literal notranslate"><span class="pre">'pink'</span></code>: 1/f^beta noise at the MAD
+amplitude of the neighbouring data. <code class="docutils literal notranslate"><span class="pre">'mirror'</span></code>: neighbouring signal mirrored in
+from both sides (copies neighbouring events into the gap). <code class="docutils literal notranslate"><span class="pre">'linear'</span></code>: straight
+line (not suitable for gaps longer than ~0.1 s before background-modelling
+detectors).</p></li>
+<li><p><strong>context_s</strong> (<em>float</em>) – Maximum seconds of valid data used on each side of a long gap (spectrum, level,
+amplitude, mirror images). Default 30 s. <code class="docutils literal notranslate"><span class="pre">'spectral'</span></code> uses less for shorter
+gaps (about 16 gap lengths, at least three ~1 s Welch segments).</p></li>
+<li><p><strong>taper_s</strong> (<em>float</em>) – <code class="docutils literal notranslate"><span class="pre">'spectral'</span></code>/<code class="docutils literal notranslate"><span class="pre">'pink'</span></code>: how far (seconds) into the gap the fill is conditioned
+on the data at each edge (the whole gap if it is shorter than <code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">*</span> <span class="pre">taper_s</span></code>;
+faded out over the second half). Default 0.5 s. 0 disables the conditioning (the
+noise then starts with a step; not recommended).</p></li>
+<li><p><strong>beta</strong> (<em>float</em>) – Spectral exponent for <code class="docutils literal notranslate"><span class="pre">'pink'</span></code> (and for the <code class="docutils literal notranslate"><span class="pre">'spectral'</span></code> fallback when fewer
+than 16 valid context samples exist).</p></li>
+<li><p><strong>seed</strong> (<em>None</em><em>, </em><em>int</em><em>, </em><em>sequence</em><em> of </em><em>int</em><em>, </em><em>SeedSequence</em><em> or </em><em>Generator</em>) – Root of the per-gap random streams (see “Randomness” in the module docstring).
+Default 0: reproducible. A gap’s noise depends only on the seed, the gap’s
+length and the data next to it (quantised to 1/1000 of its robust SD), not on
+its position in the array.</p></li>
+<li><p><strong>axis</strong> (<em>int</em>) – Time axis for N-D input; every other index is a channel, filled independently.</p></li>
+<li><p><strong>all_nan</strong> (<em>{'keep'</em><em>, </em><em>'zero'</em><em>, </em><em>'raise'}</em>) – A channel without any finite sample: <code class="docutils literal notranslate"><span class="pre">'keep'</span></code> (default) leaves it unchanged
+(non-finite) and warns once, listing the channel indices; <code class="docutils literal notranslate"><span class="pre">'zero'</span></code> fills it with
+zeros and warns; <code class="docutils literal notranslate"><span class="pre">'raise'</span></code> raises <code class="docutils literal notranslate"><span class="pre">ValueError</span></code>.</p></li>
+<li><p><strong>copy</strong> (<em>bool</em>) – If False and <code class="docutils literal notranslate"><span class="pre">x</span></code> is a writable floating-point ndarray, it is filled <strong>in place</strong>
+and returned (no extra memory). Otherwise a filled copy is returned.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Same shape as <code class="docutils literal notranslate"><span class="pre">x</span></code>; same dtype for floating-point input (float32 stays float32),
+float64 otherwise. Finite everywhere except all-NaN channels with
+<code class="docutils literal notranslate"><span class="pre">all_nan='keep'</span></code>. Valid samples are never changed.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Always remove detections in gaps afterwards with <a class="reference internal" href="#brainmaze_utils.gaps.drop_in_gaps" title="brainmaze_utils.gaps.drop_in_gaps"><code class="xref py py-func docutils literal notranslate"><span class="pre">drop_in_gaps()</span></code></a> /
+<a class="reference internal" href="#brainmaze_utils.gaps.mask_in_gaps" title="brainmaze_utils.gaps.mask_in_gaps"><code class="xref py py-func docutils literal notranslate"><span class="pre">mask_in_gaps()</span></code></a>, using gaps found on the original signal.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.gaps.find_gaps">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.gaps.</span></span><span class="sig-name descname"><span class="pre">find_gaps</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.gaps.find_gaps" title="Link to this definition">#</a></dt>
+<dd><p>Find runs of non-finite samples (NaN, +inf, -inf) in a 1-D signal.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>x</strong> (<em>array_like</em><em>, </em><em>shape</em><em> (</em><em>n_samples</em><em>,</em><em>)</em>)</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">[start,</span> <span class="pre">stop)</span></code> <strong>sample indices</strong> of each run (<code class="docutils literal notranslate"><span class="pre">stop</span></code> exclusive), in order.
+Use them in <a class="reference internal" href="#brainmaze_utils.gaps.mask_in_gaps" title="brainmaze_utils.gaps.mask_in_gaps"><code class="xref py py-func docutils literal notranslate"><span class="pre">mask_in_gaps()</span></code></a> / <a class="reference internal" href="#brainmaze_utils.gaps.drop_in_gaps" title="brainmaze_utils.gaps.drop_in_gaps"><code class="xref py py-func docutils literal notranslate"><span class="pre">drop_in_gaps()</span></code></a> with
+<code class="docutils literal notranslate"><span class="pre">gap_units='samples'</span></code>.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray, shape (n_gaps, 2), int64</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.gaps.gap_intervals">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.gaps.</span></span><span class="sig-name descname"><span class="pre">gap_intervals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.gaps.gap_intervals" title="Link to this definition">#</a></dt>
+<dd><p>Gaps of a 1-D signal as <code class="docutils literal notranslate"><span class="pre">[start,</span> <span class="pre">stop)</span></code> <strong>times in seconds</strong>, shape (n_gaps, 2),
+float64. Use them with <code class="docutils literal notranslate"><span class="pre">gap_units='seconds'</span></code> in <a class="reference internal" href="#brainmaze_utils.gaps.mask_in_gaps" title="brainmaze_utils.gaps.mask_in_gaps"><code class="xref py py-func docutils literal notranslate"><span class="pre">mask_in_gaps()</span></code></a> /
+<a class="reference internal" href="#brainmaze_utils.gaps.drop_in_gaps" title="brainmaze_utils.gaps.drop_in_gaps"><code class="xref py py-func docutils literal notranslate"><span class="pre">drop_in_gaps()</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.gaps.mask_in_gaps">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.gaps.</span></span><span class="sig-name descname"><span class="pre">mask_in_gaps</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">det</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gaps</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fs</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">units</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gap_units</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">margin_s</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.gaps.mask_in_gaps" title="Link to this definition">#</a></dt>
+<dd><p>Boolean mask of detections that are in or near a gap (gap widened by <code class="docutils literal notranslate"><span class="pre">margin_s</span></code> on
+each side).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>det</strong> (<em>array_like</em>) – Detection positions, or interval starts, in <code class="docutils literal notranslate"><span class="pre">units</span></code>.</p></li>
+<li><p><strong>gaps</strong> (<em>array_like</em><em>, </em><em>shape</em><em> (</em><em>n_gaps</em><em>, </em><em>2</em><em>)</em>) – <code class="docutils literal notranslate"><span class="pre">[start,</span> <span class="pre">stop)</span></code> of each gap in <code class="docutils literal notranslate"><span class="pre">gap_units</span></code>: <a class="reference internal" href="#brainmaze_utils.gaps.find_gaps" title="brainmaze_utils.gaps.find_gaps"><code class="xref py py-func docutils literal notranslate"><span class="pre">find_gaps()</span></code></a> gives samples,
+<a class="reference internal" href="#brainmaze_utils.gaps.gap_intervals" title="brainmaze_utils.gaps.gap_intervals"><code class="xref py py-func docutils literal notranslate"><span class="pre">gap_intervals()</span></code></a> gives seconds. Need not be sorted; may overlap.</p></li>
+<li><p><strong>fs</strong> (<em>float</em>) – Sampling frequency (Hz). Always required (<code class="docutils literal notranslate"><span class="pre">margin_s</span></code> is in seconds).</p></li>
+<li><p><strong>units</strong> (<em>{'seconds'</em><em>, </em><em>'samples'}</em>) – Units of <code class="docutils literal notranslate"><span class="pre">det</span></code> (and <code class="docutils literal notranslate"><span class="pre">end</span></code>). Required, no default.</p></li>
+<li><p><strong>gap_units</strong> (<em>{'seconds'</em><em>, </em><em>'samples'}</em>) – Units of <code class="docutils literal notranslate"><span class="pre">gaps</span></code>. Required, no default. The two are separate on purpose: a
+mix-up (e.g. sample-index detections against gaps converted to seconds) would
+silently mask nothing, so you state each one.
+Integer-typed values with <code class="docutils literal notranslate"><span class="pre">'seconds'</span></code> raise <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> (pass whole seconds
+as floats); with <code class="docutils literal notranslate"><span class="pre">'samples'</span></code>, float values must be integral within 1e-6
+(<code class="docutils literal notranslate"><span class="pre">t</span> <span class="pre">*</span> <span class="pre">fs</span></code> is fine) or <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> is raised.</p></li>
+<li><p><strong>margin_s</strong> (<em>float</em>) – Exclusion margin around every gap, in <strong>seconds</strong>, &gt;= 0. Default 0.1 s.</p></li>
+<li><p><strong>end</strong> (<em>array_like</em><em>, </em><em>optional</em>) – Interval ends (same units and shape, <code class="docutils literal notranslate"><span class="pre">end</span> <span class="pre">&gt;=</span> <span class="pre">det</span></code>) for interval detections; an
+interval is masked if any part of <code class="docutils literal notranslate"><span class="pre">[det,</span> <span class="pre">end]</span></code> overlaps a widened gap.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>np.ndarray of bool, shape of <code class="docutils literal notranslate"><span class="pre">np.atleast_1d(det)</span></code>; True = drop the detection.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="brainmaze_utils.gaps.pink_noise">
+<span class="sig-prename descclassname"><span class="pre">brainmaze_utils.gaps.</span></span><span class="sig-name descname"><span class="pre">pink_noise</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">beta</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fmin_bins</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rng</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#brainmaze_utils.gaps.pink_noise" title="Link to this definition">#</a></dt>
+<dd><p>Zero-mean, unit-variance 1/f^beta noise of length <code class="docutils literal notranslate"><span class="pre">n</span></code> (spectral synthesis).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n</strong> (<em>int</em>) – Number of samples.</p></li>
+<li><p><strong>beta</strong> (<em>float</em>) – Spectral exponent of the power spectrum, <code class="docutils literal notranslate"><span class="pre">P(f)</span> <span class="pre">~</span> <span class="pre">1/f**beta</span></code> (1 = pink, 0 = white,
+2 = brown).</p></li>
+<li><p><strong>fmin_bins</strong> (<em>int</em>) – Lowest non-zero frequency bin kept. Bins below are zeroed so that the realisation
+does not wander on time scales longer than the segment itself.</p></li>
+<li><p><strong>rng</strong> (<em>np.random.Generator</em><em>, </em><em>int</em><em> or </em><em>None</em>) – Generator or seed (passed to <code class="xref py py-func docutils literal notranslate"><span class="pre">numpy.random.default_rng()</span></code>).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>np.ndarray, shape (n,), float64</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+                </article>
+              
+
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="vector.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Vector</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="annotations.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Annotations</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item"><div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#recommended-pipeline">Recommended pipeline</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-fill-at-all">Why fill at all</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#fill-methods">Fill methods</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#edges">Edges</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#units-post-filters">Units (post-filters)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#randomness">Randomness</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#montages-bipolar-car-derive-first-then-fill">Montages (bipolar, CAR): derive first, then fill</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#defaults-and-the-evidence-behind-them">Defaults and the evidence behind them</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#release">Release</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#limitations">Limitations</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.gaps.drop_in_gaps"><code class="docutils literal notranslate"><span class="pre">drop_in_gaps()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.gaps.fill_gaps"><code class="docutils literal notranslate"><span class="pre">fill_gaps()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.gaps.find_gaps"><code class="docutils literal notranslate"><span class="pre">find_gaps()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.gaps.gap_intervals"><code class="docutils literal notranslate"><span class="pre">gap_intervals()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.gaps.mask_in_gaps"><code class="docutils literal notranslate"><span class="pre">mask_in_gaps()</span></code></a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#brainmaze_utils.gaps.pink_noise"><code class="docutils literal notranslate"><span class="pre">pink_noise()</span></code></a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+<div class="bd-footer-content__inner container">
+  
+  <div class="footer-item">
+    
+<p class="component-author">
+By Filip Mivalt M.Sc., Ph.D.
+</p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+
+  <p class="copyright">
+    
+      © Copyright 2020-present, Mayo Clinic Department of Neurology - Laboratory of Bioelectronics Neurophysiology and Engineering. All rights reserved.
+      <br/>
+    
+  </p>
+
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+  <div class="footer-item">
+    
+  </div>
+  
+</div>
+          </footer>
+        
+
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="_static/scripts/bootstrap.js?digest=90905a2f556bf617f1a9"></script>
+<script defer src="_static/scripts/pydata-sphinx-theme.js?digest=90905a2f556bf617f1a9"></script>
+
+  <footer class="bd-footer">
+  </footer>
+  </body>
+</html>

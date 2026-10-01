@@ -28,6 +28,7 @@ BrainMaze Utils Modules
    stat
    types
    vector
+   gaps
    annotations
 
    

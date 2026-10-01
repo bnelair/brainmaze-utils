@@ -212,6 +212,7 @@
 <li class="toctree-l1"><a class="reference internal" href="stat.html">Stats</a></li>
 <li class="toctree-l1"><a class="reference internal" href="types.html">Types</a></li>
 <li class="toctree-l1"><a class="reference internal" href="vector.html">Vector</a></li>
+<li class="toctree-l1"><a class="reference internal" href="gaps.html">Gaps (NaN handling)</a></li>
 <li class="toctree-l1"><a class="reference internal" href="annotations.html">Annotations</a></li>
 </ul>
 
@@ -366,12 +367,21 @@
 </li>
       </ul></li>
       <li>
+    brainmaze_utils.gaps
+
+      <ul>
+        <li><a href="gaps.html#module-brainmaze_utils.gaps">module</a>
+</li>
+      </ul></li>
+      <li>
     brainmaze_utils.signal
 
       <ul>
         <li><a href="signal.html#module-brainmaze_utils.signal">module</a>
 </li>
       </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li>
     brainmaze_utils.stat
 
@@ -379,8 +389,6 @@
         <li><a href="stat.html#module-brainmaze_utils.stat">module</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li>
     brainmaze_utils.types
 
@@ -425,15 +433,17 @@
       </ul></li>
       <li><a href="signal.html#brainmaze_utils.signal.LowFrequencyFilter.design_filters">design_filters() (brainmaze_utils.signal.LowFrequencyFilter method)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="signal.html#brainmaze_utils.signal.detrend">detrend() (in module brainmaze_utils.signal)</a>
 </li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="types.html#brainmaze_utils.types.DicToObj">DicToObj() (in module brainmaze_utils.types)</a>
 </li>
       <li><a href="types.html#brainmaze_utils.types.DictToObjDict">DictToObjDict() (in module brainmaze_utils.types)</a>
 </li>
       <li><a href="signal.html#brainmaze_utils.signal.downsample_min_max">downsample_min_max() (in module brainmaze_utils.signal)</a>
+</li>
+      <li><a href="gaps.html#brainmaze_utils.gaps.drop_in_gaps">drop_in_gaps() (in module brainmaze_utils.gaps)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -443,9 +453,13 @@
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="signal.html#brainmaze_utils.signal.fft_filter">fft_filter() (in module brainmaze_utils.signal)</a>
 </li>
+      <li><a href="gaps.html#brainmaze_utils.gaps.fill_gaps">fill_gaps() (in module brainmaze_utils.gaps)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="signal.html#brainmaze_utils.signal.LowFrequencyFilter.filter_signal">filter_signal() (brainmaze_utils.signal.LowFrequencyFilter method)</a>
+</li>
+      <li><a href="gaps.html#brainmaze_utils.gaps.find_gaps">find_gaps() (in module brainmaze_utils.gaps)</a>
 </li>
       <li><a href="signal.html#brainmaze_utils.signal.find_peaks">find_peaks() (in module brainmaze_utils.signal)</a>
 </li>
@@ -455,6 +469,8 @@
 <h2 id="G">G</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="gaps.html#brainmaze_utils.gaps.gap_intervals">gap_intervals() (in module brainmaze_utils.gaps)</a>
+</li>
       <li><a href="signal.html#brainmaze_utils.signal.get_datarate">get_datarate() (in module brainmaze_utils.signal)</a>
 </li>
       <li><a href="files.html#brainmaze_utils.files.get_files">get_files() (in module brainmaze_utils.files)</a>
@@ -503,11 +519,15 @@
 <h2 id="M">M</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="gaps.html#brainmaze_utils.gaps.mask_in_gaps">mask_in_gaps() (in module brainmaze_utils.gaps)</a>
+</li>
       <li>
     module
 
       <ul>
         <li><a href="files.html#module-brainmaze_utils.files">brainmaze_utils.files</a>
+</li>
+        <li><a href="gaps.html#module-brainmaze_utils.gaps">brainmaze_utils.gaps</a>
 </li>
         <li><a href="signal.html#module-brainmaze_utils.signal">brainmaze_utils.signal</a>
 </li>
@@ -543,6 +563,10 @@
 
 <h2 id="P">P</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="gaps.html#brainmaze_utils.gaps.pink_noise">pink_noise() (in module brainmaze_utils.gaps)</a>
+</li>
+  </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="signal.html#brainmaze_utils.signal.PSD">PSD() (in module brainmaze_utils.signal)</a>
 </li>
