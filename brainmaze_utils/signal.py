@@ -533,51 +533,202 @@ def PSD(x:np.ndarray, fs:float, nperseg=None, noverlap=0, nfft=None):
     #psdx[np.isinf(psdx)] = np.nan
     return #psdx
 
+def _line_fit(x):
+    """
+    Least-squares line through each row of ``x`` (last axis), sample index as abscissa.
+
+    Returns ``(slope, intercept)`` with shape ``x.shape[:-1]``; the line is
+    ``slope * k + intercept`` for ``k = 0 .. n-1``. A single sample gives slope 0.
+    """
+    n = x.shape[-1]
+    if n < 2:
+        return np.zeros(x.shape[:-1]), x[..., 0].astype(float)
+    k = np.arange(n, dtype=float)
+    k_c = k - k.mean()
+    y_m = x.mean(axis=-1)
+    slope = (x * k_c).sum(axis=-1) / (k_c ** 2).sum()
+    return slope, y_m - slope * k.mean()
+
+
+def _extend_edges_linear(x, n_front, n_back, n_fit):
+    """
+    Extend ``x`` (last axis) by ``n_front`` / ``n_back`` samples for edge-transient-free
+    filtering.
+
+    At each edge a least-squares line is fitted to the ``n_fit`` outermost samples.
+    The extension is that line extrapolated outwards **plus** the even (mirror)
+    reflection of the residual about the line. The extension is therefore continuous
+    in value with the data and continues its local slope (offset and drift do not
+    produce a step or a kink), while the faster content is mirrored.
+    """
+    n = x.shape[-1]
+    n_fit = int(max(1, min(n, n_fit)))
+    pad_cfg = [(0, 0)] * (x.ndim - 1)
+    k = np.arange(n_fit, dtype=float)
+
+    seg = x[..., :n_fit]
+    a, b = _line_fit(seg)
+    res = seg - (a[..., None] * k + b[..., None])
+    head_res = np.pad(res, pad_cfg + [(n_front, 0)], mode='reflect' if n_fit > 1 else 'edge')[..., :n_front]
+    kh = np.arange(-n_front, 0, dtype=float)
+    head = a[..., None] * kh + b[..., None] + head_res
+
+    seg = x[..., n - n_fit:]
+    a, b = _line_fit(seg)
+    res = seg - (a[..., None] * k + b[..., None])
+    tail_res = np.pad(res, pad_cfg + [(0, n_back)], mode='reflect' if n_fit > 1 else 'edge')[..., n_fit:]
+    kt = np.arange(n_fit, n_fit + n_back, dtype=float)
+    tail = a[..., None] * kt + b[..., None] + tail_res
+
+    return np.concatenate((head, x, tail), axis=-1)
+
+
+def _zero_phase(flt, x):
+    """Forward-backward filtering along the last axis; ``flt`` is ``('sos', sos)`` or ``('ba', b, a)``."""
+    n = x.shape[-1]
+    if flt[0] == 'sos':
+        sos = flt[1]
+        padlen = min(3 * (2 * sos.shape[0] + 1), n - 1)
+        return signal.sosfiltfilt(sos, x, axis=-1, padlen=padlen)
+    b, a = flt[1], flt[2]
+    padlen = min(3 * max(len(np.atleast_1d(a)), len(b)), n - 1)
+    return signal.filtfilt(b, a, x, axis=-1, padlen=padlen)
+
+
 class LowFrequencyFilter:
     """
-        Parameters
-        ----------
-        fs : float
-            sampling frequency
-        cutoff : float
-            frequency cutoff
-        n_decimate : int
-            how many times the signal will be downsampled before the low frequency filtering
-        n_order : int
-            n-th order filter used for filtration
-        dec_cutoff : float
-            relative frequency at which the signal will be filtered when downsampled
-        filter_type : str
-            Which side of ``cutoff`` is returned:
+    Zero-phase low-pass or high-pass filter for very low cutoff frequencies relative to
+    the sampling rate (e.g. a 0.5 Hz high-pass on 8 kHz data), implemented as a
+    decimate -> filter -> upsample cascade.
 
-            - ``'lp'`` returns the low-frequency content **below** ``cutoff``.
-            - ``'hp'`` returns ``x`` minus that low-frequency content, i.e. the
-              high-frequency content **above** ``cutoff`` (use this to remove slow drift).
+    A cutoff of ``1e-4 * fs`` cannot be realised well by a direct filter (an FIR would
+    need ~1e5 taps, an IIR is ill-conditioned). Instead the signal is
 
-            Pick the one that matches the content you want to keep -- see the examples.
-        ftype : str
-            'fir' or 'iir'
+    1. halved in rate ``n_decimate`` times: each step applies a zero-phase
+       anti-aliasing low-pass (normalised cutoff ``dec_cutoff`` x Nyquist of that
+       stage) and keeps every 2nd sample;
+    2. low-passed at ``cutoff`` at the low rate ``fs / 2**n_decimate`` (zero-phase);
+    3. brought back to ``fs`` by ``n_decimate`` steps of zero-insertion followed by
+       the same anti-aliasing low-pass (gain 2).
 
+    The result of 1-3 is the low-frequency content of the signal. ``filter_type='lp'``
+    returns it; ``filter_type='hp'`` returns ``x`` minus it.
 
-        .. code-block:: python
+    Parameters
+    ----------
+    fs : float
+        Sampling frequency of the signals that will be filtered, in Hz.
+    cutoff : float
+        Cutoff frequency in Hz. Must lie below the Nyquist frequency of the low rate,
+        ``cutoff < fs / 2**n_decimate / 2``, and should lie well inside the band kept
+        by the anti-aliasing stages (``< dec_cutoff * fs / 2**(n_decimate + 1)``).
+    n_decimate : int
+        Number of halving steps (``>= 0``). The cutoff filter runs at
+        ``fs / 2**n_decimate``. Choose it so that this rate is ~20-500 x ``cutoff``,
+        e.g. ``n_decimate=5`` (250 Hz) for 0.5 Hz on 8 kHz data.
+    n_order : int, optional
+        Filter order: number of taps for ``ftype='fir'`` (default 101), Butterworth
+        order for ``ftype='iir'`` (default 3). Used for both the anti-aliasing and the
+        cutoff filter. An FIR needs about ``n_order > 3 * fs_low / cutoff`` taps to
+        resolve the cutoff (``fs_low = fs / 2**n_decimate``), otherwise its transition
+        band is much wider than ``cutoff``.
+    dec_cutoff : float
+        Normalised (to the Nyquist of each stage, ``0 < dec_cutoff < 1``) cutoff of the
+        anti-aliasing low-pass used by the halving/upsampling steps. Default 0.3.
+    filter_type : {'lp', 'hp'}
+        Which side of ``cutoff`` is returned:
 
-            x = np.random.randn(10000)
+        - ``'lp'`` returns the low-frequency content **below** ``cutoff``.
+        - ``'hp'`` returns ``x`` minus that low-frequency content, i.e. the
+          content **above** ``cutoff`` (use this to remove slow drift / DC).
+    ftype : {'fir', 'iir'}
+        ``'fir'``: :func:`scipy.signal.firwin` windowed-sinc filters (``cutoff`` is the
+        design -6 dB point). ``'iir'``: Butterworth filters in second-order sections
+        (``cutoff`` is the design -3 dB point). All filters are applied forward and
+        backward, so the phase is zero and the magnitude response is squared: at
+        ``cutoff`` the low-frequency gain is ~0.25 (FIR) or ~0.5 (IIR).
 
-            # keep slow content below the cutoff (e.g. isolate drift / a slow oscillation)
-            lowpass = LowFrequencyFilter(fs=fs, cutoff=cutoff, n_decimate=2, n_order=101, filter_type='lp')
-            x_slow = lowpass(x)
+    Examples
+    --------
+    .. code-block:: python
 
-            # remove slow drift, keeping content above the cutoff
-            highpass = LowFrequencyFilter(fs=fs, cutoff=cutoff, n_decimate=2, n_order=101, filter_type='hp')
-            x_detrended = highpass(x)
+        import numpy as np
+        from brainmaze_utils.signal import LowFrequencyFilter
+
+        fs = 8000
+        x = np.random.randn(60 * fs) + 1500.0 + np.linspace(0, 300, 60 * fs)  # DC + drift
+
+        # remove DC and slow drift below 0.5 Hz (high-pass), keep everything above
+        hp = LowFrequencyFilter(fs=fs, cutoff=0.5, n_decimate=5, ftype='iir', n_order=3, filter_type='hp')
+        x_hp = hp(x)
+
+        # keep only the slow content below 0.5 Hz
+        lp = LowFrequencyFilter(fs=fs, cutoff=0.5, n_decimate=5, ftype='iir', n_order=3, filter_type='lp')
+        x_slow = lp(x)
+
+    Notes
+    -----
+    **Input.** ``x`` may be 1-D ``(n_samples,)`` or N-D with time along the **last**
+    axis, e.g. ``(n_channels, n_samples)``. It must not contain NaN or inf (a single
+    NaN would spread over the whole output); fill gaps first and re-mask afterwards.
+    The input is not modified.
+
+    **Record edges.** A filter with a 0.5 Hz cutoff has a transient lasting
+    seconds, so what is assumed about the signal beyond the two ends of the record
+    determines the first and last few seconds of the output. This class
+
+    1. removes a least-squares straight line (offset + drift) from each signal and
+       adds it back to the low-frequency output (a zero-phase low-pass passes a
+       straight line unchanged, so for ``'hp'`` offset and linear drift are removed
+       exactly, edges included);
+    2. extends each end by ``max(3 / cutoff s, the legacy pad)`` samples: a line fitted
+       to the outermost ``2 / cutoff`` s is extrapolated and the residual is mirrored
+       about it, so the extension is continuous in value and slope with the data;
+    3. runs the cascade on the extended signal and crops the extension.
+
+    For a signal with a 2000 (uV) offset, a 40 uV/s drift and three 10 uV tones
+    (3, 10, 40 Hz) at 8 kHz, a 0.5 Hz ``'hp'`` (``n_decimate=5``, IIR order 3) gives
+    a maximum edge error of ~0.75 uV over the first/last second (previously ~1900 uV);
+    offset and drift no longer contribute at all (the output equals that for the
+    zero-mean signal). The remaining edge error is the irreducible effect of not
+    knowing the signal beyond the record, of the order of ``A * cutoff / (pi * f)``
+    for a component of amplitude ``A`` at frequency ``f``; on 1/f-like EEG it scales
+    with the signal power near and below ``cutoff``. Far from the edges (more than
+    ~3 / cutoff s), the output equals that of the cascade applied to an infinitely
+    long signal.
+
+    .. note:: **Changed after v2.0.0:**
+       The signal used to be zero-padded by only ``2 * n_order * 2**n_decimate``
+       samples (e.g. 24 ms for a 0.5 Hz filter at 8 kHz). Any offset therefore became a
+       step at both edges (output off by about half the offset, e.g. ~1000 uV for a
+       2000 uV offset, over the first/last seconds), and the filter transient reached far
+       into the record. The frequency response in the interior is unchanged. IIR filters
+       are now applied in second-order sections (numerically identical response; the
+       ``b_*``/``a_*`` attributes are kept for reference). N-D input is supported, and
+       NaN/inf input raises ``ValueError`` instead of returning all-NaN output.
     """
 
-    __version__ = '0.0.2'
+    __version__ = '0.1.0'
 
     def __init__(self, fs=None, cutoff=None, n_decimate=1, n_order=None, dec_cutoff=0.3, filter_type='lp', ftype='fir'):
+        if fs is None or cutoff is None:
+            raise ValueError('LowFrequencyFilter: fs and cutoff are required')
+        if not fs > 0:
+            raise ValueError(f'fs must be > 0, got {fs!r}')
+        if not cutoff > 0:
+            raise ValueError(f'cutoff must be > 0, got {cutoff!r}')
+        if int(n_decimate) != n_decimate or n_decimate < 0:
+            raise ValueError(f'n_decimate must be an integer >= 0, got {n_decimate!r}')
+        if not 0 < dec_cutoff < 1:
+            raise ValueError(f'dec_cutoff must be in (0, 1), got {dec_cutoff!r}')
+        if filter_type not in ('lp', 'hp'):
+            raise ValueError(f"filter_type must be 'lp' or 'hp', got {filter_type!r}")
+        if ftype not in ('fir', 'iir'):
+            raise ValueError(f"ftype must be 'fir' or 'iir', got {ftype!r}")
+
         self.fs = fs
         self.cutoff = cutoff
-        self.n_decimate = n_decimate
+        self.n_decimate = int(n_decimate)
         self.dec_cutoff = dec_cutoff
         self.filter_type = filter_type
 
@@ -585,136 +736,112 @@ class LowFrequencyFilter:
         self.ftype = ftype
 
         self.n_append = None
+        self.n_pad = None
 
         self.design_filters()
 
     def design_filters(self):
         """
-        Design decimation and filtering coefficients based on filter type (FIR or IIR).
+        Design the anti-aliasing (``*_dec``) and cutoff (``*_filt``) filters and the
+        edge-extension length ``n_pad`` (samples at ``fs``).
         """
+        fs_low = self.fs / 2 ** self.n_decimate
+        wn = 2 * self.cutoff / fs_low
+        if not 0 < wn < 1:
+            raise ValueError(
+                f'cutoff={self.cutoff!r} Hz must be below the Nyquist frequency of the decimated rate '
+                f'fs / 2**n_decimate / 2 = {fs_low / 2!r} Hz; reduce n_decimate')
+
         if self.ftype == 'fir':
             if isinstance(self.n_order, type(None)): self.n_order = 101
-            self.n_append = (2 * self.n_order) * (2**self.n_decimate)
-
             self.a_dec = [1]
             self.b_dec = signal.firwin(self.n_order, self.dec_cutoff, pass_zero=True)
             self.b_dec /= self.b_dec.sum()
 
             self.a_filt = [1]
-            self.b_filt = signal.firwin(self.n_order, 2 * self.cutoff / (self.fs/2**self.n_decimate), pass_zero=True)
+            self.b_filt = signal.firwin(self.n_order, wn, pass_zero=True)
             self.b_filt /= self.b_filt.sum()
+            self._dec = ('ba', self.b_dec, self.a_dec)
+            self._filt = ('ba', self.b_filt, self.a_filt)
 
         elif self.ftype == 'iir':
             if isinstance(self.n_order, type(None)): self.n_order = 3
-            self.n_append = (2 * self.n_order) * (2**self.n_decimate)
-
             self.b_dec, self.a_dec = signal.butter(self.n_order, self.dec_cutoff, btype='low')
-            self.b_filt, self.a_filt = signal.butter(self.n_order,  2 * self.cutoff / (self.fs/2**self.n_decimate), btype='low')
+            self.b_filt, self.a_filt = signal.butter(self.n_order, wn, btype='low')
+            self.sos_dec = signal.butter(self.n_order, self.dec_cutoff, btype='low', output='sos')
+            self.sos_filt = signal.butter(self.n_order, wn, btype='low', output='sos')
+            self._dec = ('sos', self.sos_dec)
+            self._filt = ('sos', self.sos_filt)
 
-        else: raise AssertionError(f'[INPUT ERROR]: ftype must be \'iir\' or \'fir\'')
+        # legacy pad (kept as a lower bound) and the edge extension actually used:
+        # >= 3 cutoff periods, enough for the cutoff filter's transient to die out.
+        self.n_append = (2 * self.n_order) * (2 ** self.n_decimate)
+        self.n_pad = int(max(self.n_append, np.ceil(3 * self.fs / self.cutoff)))
 
     def decimate(self, X):
         """
-        Apply anti-aliasing filter and downsample signal by factor of 2.
-
-        Parameters
-        ----------
-        X : numpy.ndarray
-            Input signal
-
-        Returns
-        -------
-        numpy.ndarray
-            Downsampled signal
+        Anti-aliasing low-pass (zero-phase) and downsampling by 2 along the last axis.
         """
-        X = signal.filtfilt(self.b_dec, self.a_dec, X)
-        return X[::2]
+        return _zero_phase(self._dec, X)[..., ::2]
 
     def upsample(self, X):
         """
-        Upsample signal by factor of 2 using zero-insertion and filtering.
-
-        Parameters
-        ----------
-        X : numpy.ndarray
-            Input signal
-
-        Returns
-        -------
-        numpy.ndarray
-            Upsampled signal
+        Upsample by 2 along the last axis: zero-insertion, then the anti-aliasing
+        low-pass (zero-phase) with gain 2.
         """
-        X_up = np.zeros(X.shape[0] * 2)
-        X_up[::2] = X
-        X_up = signal.filtfilt(self.b_dec, self.a_dec, X_up) * 2
-        return X_up
+        X_up = np.zeros(X.shape[:-1] + (X.shape[-1] * 2,))
+        X_up[..., ::2] = X
+        return _zero_phase(self._dec, X_up) * 2
 
     def filter_signal(self, X):
         """
-        Low-pass ``X`` below ``cutoff`` using the decimate -> filter -> upsample scheme.
+        Low-frequency content of ``X`` (below ``cutoff``), same shape as ``X``.
 
-        Parameters
-        ----------
-        X : numpy.ndarray
-            1-D signal. Must not contain NaN (NaN propagates through the filters and
-            the output becomes NaN).
-
-        Returns
-        -------
-        numpy.ndarray
-            Low-frequency content of ``X``, same length.
-
-        Notes
-        -----
-        The signal mean is removed before filtering and added back afterwards, and
-        the signal is extended at both ends by even (mirror) reflection. The
-        reflection is continuous in value, so a DC offset does not create artificial
-        steps at the record edges.
-
-        .. note:: **Changed after v2.0.0:**
-           Previously the signal was zero-padded, which turned any DC offset into a
-           step at both edges: for a signal at 100 (e.g. uV) with ``filter_type='hp'``
-           the output deviated by up to ~50 over the first/last ~1.5-2.3 s.
+        See the class notes for the edge handling. Raises ``ValueError`` if ``X``
+        contains NaN or inf.
         """
         X = np.asarray(X, dtype=float)
-        mu = X.mean() if X.size else 0.0
-        X = X - mu
-        n = X.shape[0]
+        if X.ndim == 0:
+            raise ValueError('LowFrequencyFilter expects at least a 1-D signal')
+        if not np.all(np.isfinite(X)):
+            raise ValueError('LowFrequencyFilter: X contains NaN/inf; fill gaps before filtering '
+                             '(e.g. brainmaze_utils.gaps.fill_gaps) and re-mask afterwards')
+        n = X.shape[-1]
+        if n == 0:
+            return X.copy()
 
-        # extend for filter transients + make length divisible by 2**n_decimate
-        total = n + 2 * self.n_append
-        C = (-total) % (2 ** self.n_decimate)
-        pad_front = self.n_append + C
-        pad_back = self.n_append
-        if n > 1:
-            X = np.pad(X, (pad_front, pad_back), mode='reflect')
-        else:
-            X = np.pad(X, (pad_front, pad_back), mode='edge')
+        slope, intercept = _line_fit(X)
+        trend = slope[..., None] * np.arange(n) + intercept[..., None]
+        R = X - trend
 
-        for k in range(self.n_decimate):
-            X = self.decimate(X)
+        q = 2 ** self.n_decimate
+        C = (-(n + 2 * self.n_pad)) % q
+        pad_front = self.n_pad + C
+        pad_back = self.n_pad
+        n_fit = int(round(2 * self.fs / self.cutoff))  # two cutoff periods
+        R = _extend_edges_linear(R, pad_front, pad_back, n_fit)
 
-        X = signal.filtfilt(self.b_filt, self.a_filt, X)
+        for _ in range(self.n_decimate):
+            R = self.decimate(R)
+        R = _zero_phase(self._filt, R)
+        for _ in range(self.n_decimate):
+            R = self.upsample(R)
 
-        for k in range(self.n_decimate):
-            X = self.upsample(X)
-
-        X = X[pad_front: pad_front + n]
-        return X + mu
-
+        return R[..., pad_front: pad_front + n] + trend
 
     def __call__(self, X):
         """
-        Apply the filter.
+        Apply the filter along the last axis.
 
         Returns the low-frequency content (``filter_type='lp'``) or ``X`` minus the
         low-frequency content (``filter_type='hp'``). ``X`` is not modified.
         """
-        X_orig = np.asarray(X, dtype=float).copy()
-        X = self.filter_signal(X_orig)
-        if self.filter_type == 'lp': return X
-        if self.filter_type == 'hp': return X_orig - X
-        raise ValueError(f"filter_type must be 'lp' or 'hp', got {self.filter_type!r}")
+        X = np.asarray(X, dtype=float)
+        low = self.filter_signal(X)
+        if self.filter_type == 'lp':
+            return low
+        return X - low
+
 
 def resample(x, fsamp_orig, fsamp_new):
     """
