@@ -9,6 +9,25 @@ class ObjDict(dict):
     """
     Dictionary which you can access a) as a dict; b) as a struct with attributes. Can use both foo adding and deleting
     attributes resp items. Inherits from dict
+
+    Missing keys are created on access (auto-vivification), both as items and as
+    attributes, so nested structures can be built directly::
+
+        d = ObjDict()
+        d.cfg.sub = 3          # {'cfg': {'sub': 3}}
+        d['a']['b'] = 1        # {'cfg': ..., 'a': {'b': 1}}
+
+    A consequence (unchanged from v2.0.0): reading a missing public attribute
+    creates it as an empty ``ObjDict``, so ``hasattr(d, 'x')`` is always ``True`` for
+    public names and creates ``'x'``; test membership with ``'x' in d`` instead.
+
+    Names starting with an underscore (including dunders such as ``__deepcopy__``)
+    are never auto-created; reading a missing one raises ``AttributeError``.
+
+    .. note:: **Changed after v2.0.0:**
+       Dunder lookups used to auto-create keys too, so :func:`copy.deepcopy`, ``copy``
+       and ``pickle`` of an ``ObjDict`` failed (``'ObjDict' object is not callable``)
+       and protocol probes (``__array__``, ``_repr_html_``, ...) added junk keys.
     """
 
     def __init__(self, VT_={}):
@@ -53,8 +72,13 @@ class ObjDict(dict):
         return self[key]
 
     def __getattr__(self, item):
-        if not item in self.__dir__():
-            self.__missing__(item)
+        # only called when normal attribute lookup fails -> the key does not exist.
+        # Public names auto-vivify (v2.0.0 behaviour, d.a.b = 1). Private/dunder names
+        # must raise: copy/deepcopy/pickle and other protocols probe them with getattr
+        # and break (or get junk keys) if an empty ObjDict is returned.
+        if item.startswith('_'):
+            raise AttributeError(f"{type(self).__name__!s} has no attribute {item!r}")
+        self.__missing__(item)
         return super().__getattribute__(item)
 
 class TwoWayDict(dict):

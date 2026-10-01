@@ -20,6 +20,47 @@ Installation
 
     pip install brainmaze-utils
 
+Supported dependency versions: NumPy 1.24+ (1.x and 2.x), SciPy 1.10+, pandas 2.x and 3.x.
+
+Signal-processing conventions
+"""""""""""""""""""""""""""""""
+
+- Multichannel arrays are ``(n_channels, n_samples)``: time runs along the **last** axis.
+  Frequencies are in Hz, durations in seconds. Functions return new arrays and do not modify
+  their inputs.
+- NaN marks missing data. Every function documents what it does with NaN; resampling functions
+  re-apply the gaps to their output instead of silently filling them.
+- **Which functions filter?**
+
+  - ``signal.decimate``: anti-aliasing low-pass included (16th-order Butterworth in second-order
+    sections, zero-phase, default cutoff ``fs_new / 3``), then resampling to exactly ``k / fs_new``
+    (any ratio, including non-round rates such as 30000.5 Hz; it also upsamples). Use this to
+    change the sampling rate.
+  - ``signal.resample``: **no anti-aliasing filter, by design.** It only interpolates. When
+    downsampling, low-pass the signal below the new Nyquist frequency first, or use ``decimate``.
+    Otherwise content above ``fs_new / 2`` aliases into the output.
+  - ``signal.nandecimate``: weak 30-tap FIR anti-aliasing (legacy); prefer ``decimate``.
+  - ``signal.LowFrequencyFilter``: zero-phase low-/high-pass for very low cutoffs (e.g. a 0.5 Hz
+    high-pass on 8 kHz data) via a decimate/filter/upsample cascade. DC offset and linear drift
+    are handled exactly at the record edges, so there are no start/end jumps. NaN gaps are
+    handled (short ones bridged, long ones split into segments with the same edge handling);
+    the output is NaN exactly where the input is, so it can follow ``decimate`` in a cascade.
+  - ``signal.fft_filter``: brick-wall FFT filter (rings at transients; record edges periodic by
+    default, ``edges='extend'`` for the edge handling above). NaN gaps handled as above.
+
+.. code-block:: python
+
+    import scipy.signal as ss
+    from brainmaze_utils.signal import decimate, resample
+
+    y = decimate(x, fs=2000, fs_new=250)               # filtered + downsampled, NaN-aware
+
+    sos = ss.butter(8, 100, 'lp', fs=2000, output='sos')
+    y = resample(ss.sosfiltfilt(sos, x), 2000, 250)    # resample: you low-pass first
+
+See the *Changes* page of the documentation for behaviour changes after v2.0.0 (bug fixes
+that change numerical results).
+
 How to contribute
 """""""""""""""""""""""""""
 The project has 2 main protected branches *main* that contains official software releases and *dev* that contains the latest feature implementations shared with developers.

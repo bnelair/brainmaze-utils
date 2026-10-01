@@ -16,7 +16,7 @@ from copy import deepcopy
 
 from ._formats.CyberPSG import CyberPSGFile, CyberPSG_XML_Writter
 from ._formats.NSRR import NSRRSleepFile
-from ._utils import time_to_utc, create_duration, tile_annotations
+from ._utils import time_to_utc, time_to_timestamp, create_duration, tile_annotations
 
 
 
@@ -107,7 +107,11 @@ _hypnogram_colors = {
 }
 
 
-def load_CyberPSG(path, tile=None, verbose=True):
+#: label suffixes removed by load_CyberPSG (at most one, the first that matches)
+CYBERPSG_LABEL_SUFFIXES = ('_bm', '_best', '_aisc', '_PiesPro')
+
+
+def load_CyberPSG(path, tile=None, verbose=True, strip_suffixes=True):
     """
     Load annotations from CyberPSG XML file(s).
 
@@ -119,20 +123,43 @@ def load_CyberPSG(path, tile=None, verbose=True):
         Time duration in seconds to tile annotations into fixed-length segments
     verbose : bool, optional
         If True, display progress bar for multiple files (default: True)
+    strip_suffixes : bool, optional
+        If True (default), one of the suffixes ``_bm`` (written by
+        :func:`save_CyberPSG`), ``_best`` (written by v2.0.0 and earlier), ``_aisc`` or
+        ``_PiesPro`` is removed from every label, so files written by any version load
+        to the same label set (``N2_bm``, ``N2_best`` -> ``N2``). Set to False to get the
+        names exactly as stored, e.g. to tell a scorer's ``N2`` from a model's
+        ``N2_best`` in the same file (with True both load as ``N2``).
 
     Returns
     -------
     pandas.DataFrame or list
-        DataFrame with annotation columns (annotation, start, end, duration)
-        or list of DataFrames if multiple paths provided
+        DataFrame with annotation columns (annotation, start, end, duration, and
+        ``channel`` for channel annotations) or list of DataFrames if multiple paths
+        provided. ``start``/``end`` are timezone-aware UTC datetimes; fractional
+        seconds beyond microseconds (.NET writes 7 digits) are truncated.
+        Label suffixes are handled as described for ``strip_suffixes``.
+
+    Notes
+    -----
+    .. note:: **Changed after v2.0.0:**
+       ``_bm`` and ``_best`` are stripped as well (v2.0.0 stripped only ``_aisc`` and
+       ``_PiesPro``, so its own files loaded as ``N2_best``, ``IED_best``, ...).
     """
     if isinstance(path, list):
-        return _load_CyberPSG_dataset(path, tile, verbose)
+        return _load_CyberPSG_dataset(path, tile, verbose, strip_suffixes)
     else:
-        return _load_CyberPSG(path, tile)
+        return _load_CyberPSG(path, tile, strip_suffixes)
 
 
-def _load_CyberPSG(path, tile=None):
+def _strip_label_suffix(label):
+    for suffix in CYBERPSG_LABEL_SUFFIXES:
+        if isinstance(label, str) and label.endswith(suffix) and len(label) > len(suffix):
+            return label[:-len(suffix)]
+    return label
+
+
+def _load_CyberPSG(path, tile=None, strip_suffixes=True):
     if not os.path.isfile(path):
         raise FileNotFoundError('[FILE ERROR]: File not found ' + path)
     fid = CyberPSGFile(path)
@@ -141,23 +168,20 @@ def _load_CyberPSG(path, tile=None):
     df = create_duration(df)
     if not isinstance(tile, type(None)):
         if (df.duration > tile).sum() > 0:
-            df = tile_annotations(df, tile)
+            # tile_annotations works on numeric timestamps; convert, tile, convert back
+            df = time_to_utc(tile_annotations(time_to_timestamp(df), tile))
 
-    for k in df.annotation.unique():
-        if k[-5:] == '_aisc':
-            df.loc[df.annotation == k, 'annotation'] = k[:-5]
-
-        if k[-8:] == '_PiesPro':
-            df.loc[df.annotation == k, 'annotation'] = k[:-8]
+    if strip_suffixes and len(df):
+        df['annotation'] = df['annotation'].map(_strip_label_suffix)
     return df
 
 
-def _load_CyberPSG_dataset(paths: list, tile=None, verbose=True):
+def _load_CyberPSG_dataset(paths: list, tile=None, verbose=True, strip_suffixes=True):
     if verbose:
         print('Loading annotations Dataset')
-        return [_load_CyberPSG(pth, tile) for pth in tqdm(paths)]
+        return [_load_CyberPSG(pth, tile, strip_suffixes) for pth in tqdm(paths)]
     else:
-        return [_load_CyberPSG(pth, tile) for pth in paths]
+        return [_load_CyberPSG(pth, tile, strip_suffixes) for pth in paths]
 
 
 def save_CyberPSG(path, df):
@@ -174,8 +198,21 @@ def save_CyberPSG(path, df):
 
     Notes
     -----
-    TODO: Do Tests
-    TODO: Implement annotation groups etc
+    Label names on disk: standard labels (``AWAKE, N1, N2, N3, REM, UNKNOWN, Arousal,
+    N, SLP, IED, seizure, seizure_05, seizure_08``) are written with the suffix
+    ``_bm`` (``'N2'`` -> ``'N2_bm'``), with exactly the type UUIDs that v2.0.0 wrote
+    for them (v2.0.0 wrote ``'N2_best'``, same UUID). Input labels ``'N2_best'`` or
+    ``'N2_bm'`` are the same type as ``'N2'``. Every other label is written as given.
+    :func:`load_CyberPSG` strips ``_bm`` and ``_best``, so
+    ``load_CyberPSG(save_CyberPSG(df))`` returns the labels of ``df`` (with any
+    ``_best``/``_bm`` suffix removed), and files written by v2.0.0 load to the same
+    labels. Times are written in UTC with microsecond precision. ``df`` is not
+    modified.
+
+    .. note:: **Changed after v2.0.0:**
+       The suffix written to standard labels is ``_bm`` instead of ``_best``. Type
+       UUIDs are unchanged. ``'N2'`` and ``'N2_best'`` in the same frame no longer
+       raise (they are one type).
     """
     #TODO: Do Tests
     #TODO: Implement annotation groups etc
@@ -191,7 +228,11 @@ def save_CyberPSG(path, df):
     df = time_to_utc(df)
 
     fid.add_AnnotationGroup(annotation_group, uuid_='00000000-0000-0000-0000-000000000001')
+    written = set()
     for atype in annotation_types:
+        if fid.written_name(atype) in written:  # e.g. 'N2' and 'N2_best' -> one type 'N2_bm'
+            continue
+        written.add(fid.written_name(atype))
         if atype in _hypnogram_colors.keys():
             fid.add_AnnotationType(atype, groupAssociationId=annotation_group, color=_hypnogram_colors[atype])
         else:

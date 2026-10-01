@@ -22,8 +22,8 @@ class myXML(ABC):
     This function represents a single tag in XML structure.
     E.g.
     <meta attr1='0'>
-    <time> '01-02-03' <\time>
-    <\meta>
+    <time> '01-02-03' </time>
+    </meta>
     etc.
     Object meta is defined by its tag 'meta' and and attribute 0. Has also the child with tag 'time'.
     Sub-object 'time' has only param '01-02-03'

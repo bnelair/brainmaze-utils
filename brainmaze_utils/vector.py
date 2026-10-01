@@ -33,12 +33,18 @@ def translate(x, m):
     Returns
     -------
     numpy.ndarray
-        Translated vectors
+        Translated vectors as a **new** array; ``x`` is not modified. The dtype is
+        promoted as needed (an integer ``x`` translated by ``0.5`` gives floats).
+
+    Notes
+    -----
+    .. note:: **Changed after v2.0.0:**
+       Previously ``x`` was modified in place and the result kept ``x``'s dtype, so
+       integer input silently truncated fractional offsets.
     """
+    x = np.asarray(x)
     _check_scale(x, m)
-    for idx, s in enumerate(m):
-        x[:, idx] = x[:, idx] + s
-    return x
+    return x + np.asarray(m).reshape(1, -1)
 
 
 def scale(x, m):
@@ -79,7 +85,18 @@ def rotate(x, angl):
     Returns
     -------
     numpy.ndarray
-        Rotated vectors
+        Rotated vectors (new array; ``x`` is not modified).
+
+    Notes
+    -----
+    Direction convention: points are row vectors multiplied from the right by the
+    matrices of :func:`get_rot_2d` / :func:`get_rot_3d` (``x @ R``). This is the
+    transpose of the usual column-vector convention, so in 2-D a **positive angle
+    rotates clockwise**. Rotation is about the **mean of the points** (a single
+    point is therefore unchanged): ``[[0, 0], [2, 0]]`` rotated by +90 deg becomes
+    ``[[1, 1], [1, -1]]``. In 3-D the rotations are applied in the order x, y, z, each with
+    the same row-vector convention. Negate the angle(s) for counter-clockwise
+    rotation.
     """
     x = deepcopy(x)
     if isinstance(angl, (tuple, np.ndarray, list)):
@@ -222,6 +239,8 @@ def get_mutual_vectors(x, y=None):
     """
     Compute all pairwise difference vectors between points.
 
+    Row ``i * n_points + j`` of the result is ``x[i] - x[j]`` (including ``i == j``).
+
     Parameters
     ----------
     x : numpy.ndarray
@@ -239,10 +258,9 @@ def get_mutual_vectors(x, y=None):
     v = []
     for idx, x_ in enumerate(x):
         temp_x = x_ - x
-        if not isinstance(y, type(None)):
-            temp_y = np.array([y[idx] + '-' + y_ for y_ in y])
         v += [temp_x]
-        leg += [temp_y]
+        if not isinstance(y, type(None)):
+            leg += [np.array([y[idx] + '-' + y_ for y_ in y])]
     v = np.concatenate(v, axis=0)
 
     if not isinstance(y, type(None)):

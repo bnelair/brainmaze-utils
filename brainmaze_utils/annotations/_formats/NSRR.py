@@ -7,23 +7,42 @@
 import os
 import pandas as pd
 import xml.etree.ElementTree as ET
-from brainmaze_utils.types import TwoWayDict
+
+#: Default mapping of NSRR ``EventConcept`` strings to hypnogram labels (many-to-one:
+#: R&K stages 3 and 4 both map to N3).
+NSRR_TO_HYPNOGRAM = {
+    'Wake|0': 'WAKE',
+    'Stage 1 sleep|1': 'N1',
+    'Stage 2 sleep|2': 'N2',
+    'Stage 3 sleep|3': 'N3',
+    'Stage 4 sleep|4': 'N3',
+    'REM sleep|5': 'REM'
+}
+
 
 class NSRRSleepFile:
-    def __init__(self, path=None, nsrr2hypnogram_keys={
-        'Wake|0': 'WAKE',
-        'Stage 1 sleep|1': 'N1',
-        'Stage 2 sleep|2': 'N2',
-        'Stage 3 sleep|3': 'N3',
-        'Stage 4 sleep|4': 'N3',
-        'REM sleep|5': 'REM'
-    }):
-        self.namespaces = TwoWayDict() # list of namespaces - key=prefix; value=uri
+    """
+    Reader for NSRR XML annotation files (``ScoredEvents``).
+
+    Parameters
+    ----------
+    path : str, optional
+        Path to the XML file.
+    nsrr2hypnogram_keys : dict, optional
+        ``EventConcept -> label`` mapping (many-to-one allowed). Default
+        :data:`NSRR_TO_HYPNOGRAM`.
+    """
+    def __init__(self, path=None, nsrr2hypnogram_keys=None):
+        self.namespaces = {} # key=prefix; value=uri
         self.Element = None
         self.path = path
         self.strp_format = '%Y.%m.%d. %H:%M:%S'
 
-        self.nsrr2hypnogram = TwoWayDict(nsrr2hypnogram_keys)
+        # plain (many-to-one) dict: a two-way dict deleted 'Stage 3 sleep|3' when
+        # 'Stage 4 sleep|4' was also mapped to 'N3', so every Stage-3 epoch raised KeyError.
+        if nsrr2hypnogram_keys is None:
+            nsrr2hypnogram_keys = NSRR_TO_HYPNOGRAM
+        self.nsrr2hypnogram = dict(nsrr2hypnogram_keys)
 
 
 
@@ -72,6 +91,10 @@ class NSRRSleepFile:
 
         hyp = hyp.drop(['EventType'], axis=1)
 
+        unknown = sorted(set(hyp['EventConcept']) - set(self.nsrr2hypnogram))
+        if unknown:
+            raise KeyError(f'NSRR EventConcept(s) without a hypnogram mapping: {unknown}. '
+                           'Pass nsrr2hypnogram_keys to NSRRSleepFile to map them.')
         hyp['annotation'] = [self.nsrr2hypnogram[an] for an in hyp['EventConcept']]
         hyp = hyp.drop(['EventConcept'], axis=1)
 
