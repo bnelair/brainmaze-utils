@@ -89,7 +89,12 @@ variance is right everywhere, so the band power neither dips nor bulges at the e
 the junction is statistically like the data's own sample-to-sample steps. Edge residuals
 larger than 4 robust SD of the neighbouring data (e.g. an artifact cut by the dropout)
 are clipped before conditioning, so an artifact at the edge is not continued into the
-gap. ``taper_s`` (default 0.5 s) bounds how far into the gap the conditioning acts (the
+gap. The same clip applies to a large *real* event (e.g. a 300 uV K-complex or a 400 uV
+spike) that the gap cuts: the fill then starts from the clipped value, which leaves a
+step at the junction (K-complex: junction step 42x the median absolute sample
+difference, 10-60 Hz envelope 12.6x vs 2.2 gap-free; without the clip 1.2-1.9x). The
+step is confined to +-0.1 s of the edge, which the default ``drop_in_gaps`` margin
+(``margin_s=0.1``) covers; do not use a smaller margin if such events occur. ``taper_s`` (default 0.5 s) bounds how far into the gap the conditioning acts (the
 whole gap if it is shorter than ``2 * taper_s``; faded out over the second half of
 ``taper_s``). ``taper_s=0`` gives unconditioned noise with a step at each edge.
 
@@ -119,13 +124,29 @@ median. Consequently:
 - the same channel gives the same fill in a 1-D call and inside an N-D call;
 - the fill is the same across machines and numpy/scipy versions, and after upstream
   processing that differs at the rounding (ulp) level; for data rescaled (uV vs V) or
-  cast to float32; and for the same gap at another array offset (segment-wise
-  processing), as long as the context is the same. Data that differ by more than about
-  1/1000 SD give a different, independent realisation;
+  and for the same gap at another array offset (segment-wise processing), as long as the
+  context is the same. Data that differ by more than about 1/1000 SD give a different,
+  independent realisation. A float32 cast of real data is **not** guaranteed to give the
+  same fill (the rounding of ~6e-8 relative can cross a 1/1000 SD quantisation boundary:
+  5 of 20 real segments changed, 20 of 20 were unchanged for uV -> V or 1e-9 relative
+  noise); fill in one dtype throughout if bit-reproducibility across dtypes matters;
 - different channels sharing a gap (recording-wide dropouts) get **independent** noise,
-  also when they are filled one at a time in separate calls with the same seed, so
-  bipolar/CAR montages, coherence and connectivity do not see spuriously identical
-  segments. (Two channels whose context data are equal up to scale get identical fills.)
+  also when they are filled one at a time in separate calls with the same seed, so the
+  fills are not spuriously identical. (Two channels whose context data are equal up to
+  scale get identical fills.) **This does not make montages safe**, see "Montages" below.
+
+Montages (bipolar, CAR): derive first, then fill
+------------------------------------------------
+Derive the montage (bipolar, common average, ...) from the raw channels **first** and fill
+the derived signal afterwards. Filling the referential channels and then deriving
+subtracts independent noise realisations from channels that are strongly correlated in
+the real data (the real common part cancels, the independent fills add), which inflates
+the gap in the derived signal 5-22x in RMS (two referential channels with correlation
+0.962: 5.2x; 0.998: 21.6x) and raises the Janca threshold 1.22x (p90 1.38) up to 2.5 s
+*outside* the gap (0.995 correlation). Deriving first and then filling gives 1.01-1.04
+(gap RMS 1.01-1.02). Gaps of the derived signal are the union of the channels' gaps
+(non-finite samples propagate through the subtraction), so find the gaps on the derived
+signal.
 
 Defaults and the evidence behind them
 -------------------------------------
@@ -175,11 +196,23 @@ the slow-oscillation test above gave 1-2 Hz 3.3x); shorter gaps use about 16 gap
 ``taper_s=0.5``: covers the autocorrelation of typical EEG; the conditioning is exact
 within it.
 
+Release
+-------
+This module is new in brainmaze-utils 3.0.0 (a major release because numerical results of
+filled signals change); the version itself is bumped by the release workflow.
+
 Limitations
 -----------
+- At very high packet loss (>= 75 %, islands of valid data shorter than 16 samples) the
+  fill underestimates the spectrum: 8-30 Hz 0.26-0.83 and 30-240 Hz 0.44-1.03 of the
+  original (10-50 % loss: 0.99-1.00).
+- Dense large slow-oscillation or K-complex trains next to short gaps: their cycles are
+  rejected as artifacts by the Welch rule, so the fill is slightly too weak (1 s gaps:
+  11-15 Hz 0.83-0.89, 30-60 Hz 0.90-0.92 vs 0.96-1.01 without rejection; 5-30 s gaps
+  0.93-1.02).
 - The fill is stationary noise: it does not reproduce oscillatory bursts, spikes, sleep
   spindles or other non-stationary structure, nor the phase relations between channels
-  (each channel is filled independently). Do not compute features that depend on the
+  (each channel is filled independently; derive bipolar/CAR montages before filling). Do not compute features that depend on the
   content of the gap (event rates, coherence, phase) without excluding the gaps.
 - Bursty rhythms are filled at their *average* power: with the two-band rejection rule
   the burst band of the fill is 0.94-1.04 of the context for spindles and alpha/beta
