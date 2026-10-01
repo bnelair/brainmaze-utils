@@ -181,11 +181,14 @@ _UNITS = ('seconds', 'samples')
 _ALL_NAN = ('keep', 'zero', 'raise')
 _MIN_SPECTRAL_CONTEXT = 16      # valid samples needed to estimate a PSD
 _MIRROR_KINK_S = 0.01           # odd-reflection blend at the edges of the mirror fill
-_REJECT_MADS = 3.0              # context Welch segment > median + 3 MAD (log band power) = artifact
+_REJECT_MADS = 3.0              # Welch segment > median + 3 MAD in >= 2 log bands = artifact
+_REJECT_BIG_MADS = 5.0          # ... or > median + max(5 MAD, log 16) in any band
+_NPERSEG_MIN_S = 1.0            # shortest Welch segment (s): delta band in the spectrum model
+_RAYLEIGH = False               # (experiments) complex-Gaussian bins instead of random phase
 _NPERSEG_CAP_S = 8.0            # longest Welch segment (s) for long gaps (frequency resolution)
 _COND_S = 0.02                  # observed samples per edge conditioning the fill (s; 4..64)
 _CLIP_SDS = 4.0                 # edge residuals clipped to this many robust SDs (artifacts)
-_NUGGET = 1e-6                  # relative diagonal loading of the conditioning covariance
+_NUGGET = 1e-9                  # relative diagonal loading of the conditioning covariance
 
 
 # ------------------------------------------------------------------ validation helpers
@@ -286,14 +289,16 @@ def pink_noise(n, beta=1.0, fmin_bins=1, rng=None):
 
 def _nperseg(n, fs, ctx):
     """
-    Welch segment for a gap of n samples: the next power of two >= n, at least 16, at
-    most ~8 s and at most half the context (so that each side holds >= 3 segments).
-    Long gaps thus get a fine frequency resolution (0.12-0.25 Hz) and slow rhythms are not
-    smeared into higher bands.
+    Welch segment for a gap of n samples: the next power of two >= n, but at least ~1 s
+    (so that the spectrum, and with it the edge conditioning, includes the delta band
+    even for short gaps), at most ~8 s (long gaps: 0.12 Hz resolution, slow rhythms are
+    not smeared into higher bands) and at most half the context (>= 3 segments per side).
     """
-    cap = min(1 << int(np.round(np.log2(max(_NPERSEG_CAP_S * fs, 16.0)))),
-              1 << int(np.floor(np.log2(max(ctx / 2.0, 16.0)))))
-    return int(min(max(16, 1 << int(np.ceil(np.log2(max(n, 2))))), cap))
+    def p2(v, rnd):
+        return 1 << int(rnd(np.log2(max(v, 16.0))))
+    cap = min(p2(_NPERSEG_CAP_S * fs, np.round), p2(ctx / 2.0, np.floor))
+    lo = p2(_NPERSEG_MIN_S * fs, np.round)
+    return int(max(16, min(max(p2(n, np.ceil), lo), cap)))
 
 
 def _segments(ctxs, nps):
@@ -320,6 +325,24 @@ def _segments(ctxs, nps):
     return np.concatenate(segs), np.concatenate(pure)
 
 
+def _keep_segments(lb):
+    """
+    Segments (rows of log band powers ``lb``, 4 log-spaced bands) that are not artifacts.
+
+    A segment is an artifact if its log power exceeds the median over segments by more
+    than max(3 MAD, log 2) in at least TWO bands (spikes, pops and movement are broadband),
+    or by more than max(5 MAD, log 16) in any band (a single huge narrow-band event).
+    Physiological bursts (spindles, alpha/beta bursts) raise one band by less than 16x and
+    are kept (scratch/utils-gaps/r3/v3_rules.py: burst band 0.93-0.96 of the context for
+    1 s gaps, vs 0.64-0.85 with the former "any band > 3 MAD" rule).
+    """
+    med = np.median(lb, axis=0)
+    mad = 1.4826 * np.median(np.abs(lb - med), axis=0)
+    some = lb > med + np.maximum(_REJECT_MADS * mad, np.log(2.0))
+    huge = lb > med + np.maximum(_REJECT_BIG_MADS * mad, np.log(16.0))
+    return (some.sum(axis=1) < 2) & ~huge.any(axis=1)
+
+
 def _cum_power(seg, fs):
     """
     Artifact-robust Welch PSD of the segments ``seg`` (n_seg, nps) as a cumulative power
@@ -338,9 +361,7 @@ def _cum_power(seg, fs):
         nb = pw.shape[1]
         edges = np.unique(np.clip([1, nb // 64, nb // 16, nb // 4], 1, nb - 1))
         lb = np.log(np.add.reduceat(pw, edges, axis=1) + np.finfo(float).tiny)
-        med = np.median(lb, axis=0)
-        mad = 1.4826 * np.median(np.abs(lb - med), axis=0)
-        keep = np.all(lb <= med + np.maximum(_REJECT_MADS * mad, np.log(2.0)), axis=1)
+        keep = _keep_segments(lb)
         if keep.sum() >= 3:
             pw = pw[keep]
     p = pw.mean(axis=0)
@@ -392,23 +413,22 @@ def _bin_power(m, fs, cum_fn):
 
 
 def _synthesize(power, m, rng):
-    """Gaussian noise of length m with variance ``power[k]`` from rfft bin k."""
+    """
+    Noise of length m with variance ``power[k]`` from rfft bin k: random phase, amplitude
+    ``sqrt(power)`` (fixed, so the band powers of the fill match the estimate exactly
+    instead of scattering with a Rayleigh amplitude per bin; a narrow peak such as a
+    line or an alpha rhythm keeps a constant envelope).
+    """
     # a length-m irfft gets variance 2|X_k|^2/m^2 from bin k (|X_k|^2/m^2 at Nyquist)
     nb = power.size
-    X = rng.standard_normal(nb) + 1j * rng.standard_normal(nb)
-    X *= np.sqrt(power) * (m / 2.0)
+    if _RAYLEIGH:
+        X = (rng.standard_normal(nb) + 1j * rng.standard_normal(nb)) * (np.sqrt(power) * (m / 2.0))
+    else:
+        X = np.exp(2j * np.pi * rng.random(nb)) * (np.sqrt(power) * (m / np.sqrt(2.0)))
     if m % 2 == 0:
-        X[-1] = rng.standard_normal() * np.sqrt(power[-1]) * m
+        X[-1] = (1.0 if rng.random() < 0.5 else -1.0) * np.sqrt(power[-1]) * m
     X[0] = 0.0
     return np.fft.irfft(X, m)
-
-
-def _autocov(power, m, nlag):
-    """Autocovariance (lags 0..nlag-1) of the circular process synthesised from ``power``."""
-    Y = power.copy()
-    if m % 2 == 0:
-        Y[-1] *= 2.0
-    return (np.fft.irfft(Y, m) * (m / 2.0))[:nlag]
 
 
 def _robust_sd(v):
@@ -532,58 +552,56 @@ def _mirror_core(y, s, e, nxt, ctx, lvl_a, lvl_b, base):
     return base + (w * left_img + (1 - w) * right_img) / g
 
 
-def _conditioned_noise(power, R_fn, n, y_left, y_right, base_ext, clip, W, rng):
+def _conditioned_noise(power, m, n, y_left, y_right, base_ext, clip, W, rng):
     """
-    Noise of length n (variance ``power`` per bin) conditioned on the observed residuals
-    next to the gap (kriging / conditional simulation of the Gaussian process with that
-    spectrum): returns the fill minus the level bridge.
+    Gap fill minus the level bridge: Gaussian noise with variance ``power[k]`` per rfft bin
+    of a length-m circular synthesis, **conditioned on the observed samples next to the gap**
+    (conditional simulation / kriging of the Gaussian process with that spectrum).
 
-    ``y_left``/``y_right``: the last/first observed samples on each side (may be empty);
-    ``base_ext(t)``: the level bridge at relative positions t (t < 0 left, t >= n right);
-    residuals are clipped to +-``clip`` so a spike or artifact at the edge is not continued
-    into the gap; the conditioning is evaluated within ``W`` samples of each edge (the whole
-    gap if it is shorter than 2W) and faded out over the second half of W.
+    The noise ``z`` is synthesised on [left obs | gap | right obs | pad]; the fill is
+    ``z + K (d - z_obs)`` with ``K = C_gap,obs C_obs,obs^-1`` from the autocovariance of the
+    same spectrum, i.e. an exact draw from the process given the edge samples: it continues
+    the data as far as the data's own autocorrelation reaches (a smooth signal keeps value
+    and slope, white noise does not carry anything over) and has the right variance
+    everywhere. ``d`` are the residuals of the observations from the level bridge,
+    clipped to +-``clip`` so that an artifact or spike at the edge is not continued into
+    the gap. The conditioning term is applied within ``W`` samples of each edge (the whole
+    gap if it is shorter than 2 W) and faded out over the second half of W; ``W = 0``
+    gives plain (unconditioned) noise.
     """
     pl, pr = y_left.size, y_right.size
-    pad = power.pad
-    m = power.m
-    z = _synthesize(power.p, m, rng)
-    if W <= 0 or pl + pr == 0 or power.r0 <= 0:
+    z = _synthesize(power, m, rng)
+    r0 = float(power.sum())
+    if W <= 0 or pl + pr == 0 or r0 <= 0:
         return z[pl:pl + n]
-    obs_t = np.r_[np.arange(-pl, 0), np.arange(n, n + pr)]          # relative to gap start
-    d = np.r_[y_left, y_right] - base_ext(obs_t)
-    d = np.clip(d, -clip, clip) if clip > 0 else d
-    R = R_fn(n + pl + pr)
-    C = R[np.abs(obs_t[:, None] - obs_t[None, :])]
-    C[np.diag_indices_from(C)] += _NUGGET * power.r0
-    zo = np.r_[z[:pl], z[pl + n:pl + n + pr]]
+    Y = power.copy()
+    if m % 2 == 0:
+        Y[-1] *= 2.0
+    R = np.fft.irfft(Y, m) * (m / 2.0)          # circular autocovariance of z
+    obs = np.r_[np.arange(pl), np.arange(pl + n, pl + n + pr)]       # positions in z
+    d = np.r_[y_left, y_right] - base_ext(obs - pl)
+    if clip > 0:
+        d = np.clip(d, -clip, clip)
+    C = R[np.abs(obs[:, None] - obs[None, :])]
+    C[np.diag_indices_from(C)] += _NUGGET * r0
     try:
-        a = np.linalg.solve(C, d - zo)
+        a = np.linalg.solve(C, d - z[obs])
     except np.linalg.LinAlgError:
-        a = np.linalg.lstsq(C, d - zo, rcond=None)[0]
-    out = z[pl:pl + n].copy()
+        a = np.linalg.lstsq(C, d - z[obs], rcond=None)[0]
+    spikes = np.zeros(m)
+    spikes[obs] = a
+    corr = np.fft.irfft(np.fft.rfft(spikes) * Y, m)[pl:pl + n] * (m / 2.0)   # R * spikes
+    out = z[pl:pl + n]
     full = (n <= 2 * W) if (pl and pr) else (n <= W)
     if full:
-        t = np.arange(n)
-        out += R[np.abs(t[:, None] - obs_t[None, :])] @ a
-        return out
+        return out + corr
     h = W // 2
     fade = np.r_[np.ones(h), 0.5 * (1.0 + np.cos(np.pi * np.arange(1, W - h + 1) / (W - h + 1.0)))]
     if pl:
-        t = np.arange(W)
-        out[:W] += fade * (R[np.abs(t[:, None] - obs_t[None, :])] @ a)
+        out[:W] += fade * corr[:W]
     if pr:
-        t = np.arange(n - W, n)
-        out[n - W:] += fade[::-1] * (R[np.abs(t[:, None] - obs_t[None, :])] @ a)
+        out[n - W:] += fade[::-1] * corr[n - W:]
     return out
-
-
-class _Power:
-    """Per-bin variance of a length-m synthesis (m = gap + observations + pad)."""
-
-    def __init__(self, p, m, pad):
-        self.p, self.m, self.pad = p, m, pad
-        self.r0 = float(p.sum())
 
 
 def _fill_long(y, ok, s, e, nxt, fs, p, root):
@@ -592,7 +610,8 @@ def _fill_long(y, ok, s, e, nxt, fs, p, root):
     method = p['method']
     if method == 'spectral':
         nps = _nperseg(n, fs, p['ctx'])
-        L = int(min(p['ctx'], 16 * nps))
+        # context: ~16 gap lengths (rounded up to 2^k) per side, at least 3 Welch segments
+        L = int(min(p['ctx'], max(16 * (1 << int(np.ceil(np.log2(max(n, 2))))), 2 * nps)))
     else:
         nps, L = 0, p['ctx']
     lo, hi = max(s - L, 0), min(e + L, N)
@@ -640,12 +659,11 @@ def _fill_long(y, ok, s, e, nxt, fs, p, root):
         tot = power.sum()
         sd = _robust_sd(np.r_[left, right])
         power = power * (sd ** 2 / tot) if tot > 0 else power
-    pw = _Power(power, m, pad)
-    clip = _CLIP_SDS * _robust_sd(np.r_[left[-near:], right[:near]] - np.r_[
-        np.full(min(near, left.size), lvl_a), np.full(min(near, right.size), lvl_b)])
-    noise = _conditioned_noise(pw, lambda nl: _autocov(power, m, nl), n, y_left, y_right,
-                               base_ext, clip, min(p['taper'], t_cap) if two_sided else
-                               min(p['taper'], n), rng)
+    nl, nr = min(near, left.size), min(near, right.size)
+    resid = np.r_[left[left.size - nl:] - lvl_a, right[:nr] - lvl_b]
+    clip = _CLIP_SDS * _robust_sd(resid[::max(1, resid.size // 4096)])
+    W = min(p['taper'], t_cap)
+    noise = _conditioned_noise(power, m, n, y_left, y_right, base_ext, clip, W, rng)
     y[s:e] = base + noise
 
 
@@ -794,23 +812,35 @@ def fill_gaps(x, fs, *, max_interp_s=0.1, method='spectral', context_s=30.0, tap
 
 
 # ------------------------------------------------------------------ post-filtering
-def _to_seconds(name, v, units, fs):
+_INTEGRAL_TOL = 1e-6             # |v - round(v)| accepted as an integer sample index
+
+
+def _to_seconds(name, v, units, fs, units_name):
     v = np.asarray(v)
     if not np.issubdtype(v.dtype, np.number) or np.issubdtype(v.dtype, np.complexfloating):
         raise TypeError(f'{name} must be real numbers, got dtype {v.dtype}')
     vf = v.astype(np.float64)
     if not np.isfinite(vf).all():
         raise ValueError(f'{name} contains NaN/inf')
-    if units == 'samples':
-        if not np.issubdtype(v.dtype, np.integer) and np.any(vf != np.round(vf)):
-            raise ValueError(f"{name} has non-integer values but units='samples'. Are they in "
-                             "seconds? Use units='seconds' for both detections and gaps "
-                             "(gaps / fs), or convert.")
-        vf = vf / fs
-    return vf
+    if units == 'seconds':
+        if vf.size and np.issubdtype(v.dtype, np.integer):
+            raise ValueError(
+                f"{name} is integer-typed (sample indices?) but {units_name}='seconds'. "
+                f"Use {units_name}='samples' for sample indices; if they really are whole "
+                f"seconds, pass them as floats (np.asarray({name}, float)).")
+        return vf
+    if not np.issubdtype(v.dtype, np.integer):
+        r = np.round(vf)
+        if np.any(np.abs(vf - r) > _INTEGRAL_TOL):
+            raise ValueError(
+                f"{name} has non-integer values but {units_name}='samples'. Are they in "
+                f"seconds? Then use {units_name}='seconds'. (Values within {_INTEGRAL_TOL:g} "
+                "of an integer, e.g. t * fs, are accepted as sample indices.)")
+        vf = r
+    return vf / fs
 
 
-def mask_in_gaps(det, gaps, fs, *, units, margin_s=0.1, end=None):
+def mask_in_gaps(det, gaps, fs, *, units, gap_units, margin_s=0.1, end=None):
     """
     Boolean mask of detections that are in or near a gap (gap widened by ``margin_s`` on
     each side).
@@ -820,15 +850,19 @@ def mask_in_gaps(det, gaps, fs, *, units, margin_s=0.1, end=None):
     det : array_like
         Detection positions, or interval starts, in ``units``.
     gaps : array_like, shape (n_gaps, 2)
-        ``[start, stop)`` of each gap in ``units``: :func:`find_gaps` gives samples,
+        ``[start, stop)`` of each gap in ``gap_units``: :func:`find_gaps` gives samples,
         :func:`gap_intervals` gives seconds. Need not be sorted; may overlap.
     fs : float
         Sampling frequency (Hz). Always required (``margin_s`` is in seconds).
     units : {'seconds', 'samples'}
-        Units of **both** ``det``/``end`` and ``gaps``. Required, no default: a mix-up
-        would silently mask nothing. Integer-dtype ``gaps`` (as from :func:`find_gaps`)
-        with ``units='seconds'``, and non-integer values with ``units='samples'``, raise
-        ``ValueError``.
+        Units of ``det`` (and ``end``). Required, no default.
+    gap_units : {'seconds', 'samples'}
+        Units of ``gaps``. Required, no default. The two are separate on purpose: a
+        mix-up (e.g. sample-index detections against gaps converted to seconds) would
+        silently mask nothing, so you state each one.
+        Integer-typed values with ``'seconds'`` raise ``ValueError`` (pass whole seconds
+        as floats); with ``'samples'``, float values must be integral within 1e-6
+        (``t * fs`` is fine) or ``ValueError`` is raised.
     margin_s : float
         Exclusion margin around every gap, in **seconds**, >= 0. Default 0.1 s.
     end : array_like, optional
@@ -840,27 +874,23 @@ def mask_in_gaps(det, gaps, fs, *, units, margin_s=0.1, end=None):
     np.ndarray of bool, shape of ``np.atleast_1d(det)``; True = drop the detection.
     """
     fs = _check_fs(fs)
-    if units not in _UNITS:
-        raise ValueError("units must be 'seconds' or 'samples' (the units of both the "
-                         f"detections and the gaps), got {units!r}")
+    for nm, u in (('units', units), ('gap_units', gap_units)):
+        if u not in _UNITS:
+            raise ValueError(f"{nm} must be 'seconds' or 'samples', got {u!r}")
     margin_s = _check_nonneg('margin_s', margin_s)
     g_raw = np.asarray(gaps)
     if g_raw.size == 0:
         g_raw = g_raw.reshape(0, 2)
     if g_raw.ndim != 2 or g_raw.shape[1] != 2:
         raise ValueError(f'gaps must have shape (n_gaps, 2), got {g_raw.shape}')
-    if units == 'seconds' and g_raw.size and np.issubdtype(g_raw.dtype, np.integer):
-        raise ValueError("gaps are integers (sample indices from find_gaps?) but "
-                         "units='seconds'. Use units='samples' with detections in samples, "
-                         "or gaps / fs (or gap_intervals) with detections in seconds.")
-    g = _to_seconds('gaps', g_raw, units, fs)
+    g = _to_seconds('gaps', g_raw, gap_units, fs, 'gap_units')
     if np.any(g[:, 1] < g[:, 0]):
         raise ValueError('gaps must have stop >= start')
-    start = np.atleast_1d(_to_seconds('det', det, units, fs))
+    start = np.atleast_1d(_to_seconds('det', det, units, fs, 'units'))
     if end is None:
         stop = start
     else:
-        stop = np.atleast_1d(_to_seconds('end', end, units, fs))
+        stop = np.atleast_1d(_to_seconds('end', end, units, fs, 'units'))
         if stop.shape != start.shape:
             raise ValueError(f'end has shape {stop.shape}, det has shape {start.shape}')
         if np.any(stop < start):
@@ -879,7 +909,7 @@ def mask_in_gaps(det, gaps, fs, *, units, margin_s=0.1, end=None):
     return out
 
 
-def drop_in_gaps(det, gaps, fs, *, units, margin_s=0.1, end=None):
+def drop_in_gaps(det, gaps, fs, *, units, gap_units, margin_s=0.1, end=None):
     """
     Remove the detections flagged by :func:`mask_in_gaps` (same arguments).
 
@@ -888,7 +918,8 @@ def drop_in_gaps(det, gaps, fs, *, units, margin_s=0.1, end=None):
     np.ndarray, or tuple ``(det, end)`` when ``end`` is given
         The kept detections (and interval ends), with their original dtype.
     """
-    m = ~mask_in_gaps(det, gaps, fs, units=units, margin_s=margin_s, end=end)
+    m = ~mask_in_gaps(det, gaps, fs, units=units, gap_units=gap_units, margin_s=margin_s,
+                      end=end)
     d = np.atleast_1d(np.asarray(det))
     if end is None:
         return d[m]

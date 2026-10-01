@@ -81,16 +81,22 @@ def test_pink_noise_spectrum_slope_and_normalisation():
 @pytest.mark.parametrize('method', METHODS)
 @pytest.mark.parametrize('gap_s', [0.02, 0.5, 2.0, 10.0])
 def test_fill_is_finite_keeps_valid_samples_and_has_no_edge_step(method, gap_s):
-    x0 = _eeg_like()
-    x = _with_gaps(x0, [(30, 30 + gap_s), (70, 70 + gap_s)])
+    x0 = _eeg_like(n_s=400)
+    starts = np.arange(20, 380, 12.0)
+    x = _with_gaps(x0, [(a, a + gap_s) for a in starts])
     y = fill_gaps(x, FS, method=method)
     assert np.isfinite(y).all()
     valid = np.isfinite(x)
     assert np.array_equal(y[valid], x[valid])               # never touches real data
     typical = np.median(np.abs(np.diff(x0)))
-    for s, e in find_gaps(x):
-        assert abs(y[s] - y[s - 1]) <= 3 * typical           # continuous into the gap
-        assert abs(y[e] - y[e - 1]) <= 3 * typical           # and out of it
+    g = find_gaps(x)
+    # the junctions are statistically like the data's own sample-to-sample steps (a
+    # conditional simulation of the process), no systematic step into or out of the gap
+    jump = np.abs(np.r_[y[g[:, 0]] - y[g[:, 0] - 1], y[g[:, 1]] - y[g[:, 1] - 1]])
+    # ('pink': its fixed 1/f model puts the context's variance into >= 1/gap and is rougher
+    # than the data, so its junctions are too; still no systematic step)
+    assert np.median(jump) <= (2.5 if method == 'pink' else 1.5) * typical
+    assert np.max(jump) <= (8 if method == 'pink' else 6) * typical
 
 
 def test_short_gaps_are_linearly_interpolated():
@@ -253,8 +259,9 @@ def test_channel_fill_independent_of_other_channels_order_and_gaps():
     c[1000:1100] = np.nan                                   # extra gap in the other channel
     assert np.array_equal(F[1], fill_gaps(np.stack([c, b]), 500)[1])
     d = b.copy()
-    d[17000:18000] = np.nan                                 # extra gap far away, same channel
-    assert np.array_equal(F[1][:12000], fill_gaps(d, 500)[:12000])
+    d[17000:18000] = np.nan                    # extra gap outside the context, same channel
+    assert np.array_equal(fill_gaps(b, 500, context_s=10)[:12000],
+                          fill_gaps(d, 500, context_s=10)[:12000])
 
 
 def test_seed_types():
@@ -301,7 +308,7 @@ def test_inf_is_filled(method):
 
 
 # ---------------------------------------------------------------- R6: smooth edges
-@pytest.mark.parametrize('method', ['spectral', 'pink', 'mirror'])
+@pytest.mark.parametrize('method', ['spectral', 'mirror'])   # 'pink' has its own (rough) model
 def test_long_gap_edges_continue_value_and_slope(method):
     fs = 5000.0
     t = np.arange(int(20 * fs)) / fs
@@ -400,70 +407,116 @@ def test_mask_in_gaps_points_with_margin_seconds_and_samples():
     gaps = np.array([[500, 750]])                           # 2.0 - 3.0 s at 250 Hz
     t = np.array([1.85, 1.95, 2.5, 2.99, 3.05, 3.15])
     expect = [False, True, True, True, True, False]
-    assert mask_in_gaps(t, gaps / FS, FS, units='seconds', margin_s=0.1).tolist() == expect
-    assert mask_in_gaps(np.round(t * FS).astype(int), gaps, FS, units='samples',
+    assert mask_in_gaps(t, gaps / FS, FS, units='seconds', gap_units='seconds', margin_s=0.1).tolist() == expect
+    assert mask_in_gaps(np.round(t * FS).astype(int), gaps, FS, units='samples', gap_units='samples',
                         margin_s=0.1).tolist() == expect
-    assert mask_in_gaps(t, gaps / FS, FS, units='seconds', margin_s=0.0).tolist() == [
+    assert mask_in_gaps(t, gaps / FS, FS, units='seconds', gap_units='seconds', margin_s=0.0).tolist() == [
         False, False, True, True, False, False]
 
 
-def test_units_are_required_and_mixups_raise():                # R2
-    gaps = np.array([[100000, 100500]])
+def test_units_are_required_and_mixups_raise():                # R2, V6, V7
+    gaps = np.array([[100000, 100500]])                     # samples, 200.0-201.0 s at 500 Hz
     with pytest.raises(TypeError):
         mask_in_gaps([200.5], gaps, 500.0)                  # no units
+    with pytest.raises(TypeError):
+        mask_in_gaps([200.5], gaps, 500.0, units='seconds')  # no gap_units
+    with pytest.raises(ValueError):                         # sample gaps declared seconds
+        mask_in_gaps([200.5], gaps, 500.0, units='seconds', gap_units='seconds')
+    with pytest.raises(ValueError):                         # seconds detections as samples
+        mask_in_gaps([200.5], gaps, 500.0, units='samples', gap_units='samples')
     with pytest.raises(ValueError):
-        mask_in_gaps([200.5], gaps, 500.0, units='seconds')  # sample gaps as seconds
+        mask_in_gaps([100250], gaps / 500.3, 500.0, units='samples', gap_units='samples')
     with pytest.raises(ValueError):
-        mask_in_gaps([200.5], gaps, 500.0, units='samples')  # seconds detections as samples
+        mask_in_gaps([1.0], gaps / 500.0, 500.0, units='hours', gap_units='seconds')
     with pytest.raises(ValueError):
-        mask_in_gaps([100250], gaps / 500.3, 500.0, units='samples')
-    with pytest.raises(ValueError):
-        mask_in_gaps([1.0], gaps / 500.0, 500.0, units='hours')
+        mask_in_gaps([1.0], gaps / 500.0, 500.0, units='seconds', gap_units='hours')
+    # V6: integer sample detections declared as seconds raise (was: silently nothing masked)
+    with pytest.raises(ValueError, match='integer'):
+        mask_in_gaps(np.array([99990, 100510]), gaps / 500.0, 500.0, units='seconds',
+                     gap_units='seconds')
+    # sample detections (int or float) against seconds gaps: state each unit, both work
+    for det in (np.array([99990, 100510]), np.array([99990.0, 100510.0])):
+        assert mask_in_gaps(det, gaps / 500.0, 500.0, units='samples',
+                            gap_units='seconds').all()
     # eeg_forge Janca returns samples: 10 samples (20 ms) outside the gap must be dropped
-    assert mask_in_gaps(np.array([99990, 100510]), gaps, 500.0, units='samples').all()
+    assert mask_in_gaps(np.array([99990, 100510]), gaps, 500.0, units='samples',
+                        gap_units='samples').all()
+    # seconds detections against sample gaps
+    assert mask_in_gaps([199.98, 201.02, 205.0], gaps, 500.0, units='seconds',
+                        gap_units='samples').tolist() == [True, True, False]
+
+
+def test_units_integral_tolerance_and_whole_seconds():         # V7
+    fs = 5000.0
+    k = np.arange(1, 200000, 7)
+    t = k / fs
+    assert np.any(t * fs != k)                              # unrounded t*fs is not integral...
+    m = mask_in_gaps(t * fs, np.array([[k[10], k[20]]]), fs, units='samples',
+                     gap_units='samples', margin_s=0.0)
+    assert m.sum() == 10                                    # ...but accepted as samples
+    with pytest.raises(ValueError, match='non-integer'):
+        mask_in_gaps(t * fs + 0.25, np.array([[0, 10]]), fs, units='samples',
+                     gap_units='samples')
+    # whole-second annotation gaps as Python ints: the message says how to pass them
+    with pytest.raises(ValueError, match='as floats'):
+        mask_in_gaps([200.5], [[200, 201]], 500.0, units='seconds', gap_units='seconds')
+    assert mask_in_gaps([200.5], np.asarray([[200, 201]], float), 500.0, units='seconds',
+                        gap_units='seconds').tolist() == [True]
+
+
+def test_mask_boundary_is_half_open():                         # V10: stop + margin excluded
+    g = np.array([[100, 200]])
+    fs = 100.0
+    # widened gap is [100 - 10, 200 + 10) samples with margin 0.1 s
+    assert mask_in_gaps([89, 90, 209, 210], g, fs, units='samples', gap_units='samples',
+                        margin_s=0.1).tolist() == [False, True, True, False]
+    assert mask_in_gaps([0.0], g, fs, units='samples', gap_units='samples', margin_s=0.0,
+                        end=[100]).tolist() == [True]       # interval touching the start
+    assert mask_in_gaps([200], g, fs, units='samples', gap_units='samples',
+                        margin_s=0.0).tolist() == [False]   # stop is exclusive
 
 
 def test_mask_in_gaps_intervals_overlap():
     gaps_s = np.array([[2.0, 3.0], [10.0, 10.5]])
     start = np.array([1.0, 1.5, 9.0, 11.0])
     end = np.array([1.5, 2.2, 12.0, 11.5])
-    assert mask_in_gaps(start, gaps_s, FS, units='seconds', margin_s=0, end=end).tolist() == [
+    assert mask_in_gaps(start, gaps_s, FS, units='seconds', gap_units='seconds', margin_s=0, end=end).tolist() == [
         False, True, True, False]
 
 
 def test_mask_handles_unsorted_and_nested_gaps_and_empty():
     gaps_s = np.array([[10.0, 20.0], [1.0, 2.0], [12.0, 13.0]])
-    assert mask_in_gaps([15.0, 5.0, 1.5], gaps_s, FS, units='seconds',
+    assert mask_in_gaps([15.0, 5.0, 1.5], gaps_s, FS, units='seconds', gap_units='seconds',
                         margin_s=0).tolist() == [True, False, True]
-    assert mask_in_gaps([], gaps_s, FS, units='seconds').size == 0
-    assert mask_in_gaps([1.0], np.zeros((0, 2)), FS, units='seconds').tolist() == [False]
-    assert mask_in_gaps([1], find_gaps(np.arange(5.0)), FS, units='samples').tolist() == [False]
+    assert mask_in_gaps([], gaps_s, FS, units='seconds', gap_units='seconds').size == 0
+    assert mask_in_gaps([1.0], np.zeros((0, 2)), FS, units='seconds', gap_units='seconds').tolist() == [False]
+    assert mask_in_gaps([1], find_gaps(np.arange(5.0)), FS, units='samples', gap_units='samples').tolist() == [False]
 
 
 def test_mask_validation():                                    # R9
     g = np.array([[1.0, 2.0]])
     with pytest.raises(ValueError):
-        mask_in_gaps([1.5], g, 100, units='seconds', margin_s=-0.6)
+        mask_in_gaps([1.5], g, 100, units='seconds', gap_units='seconds', margin_s=-0.6)
     with pytest.raises(ValueError):
-        mask_in_gaps([1.5], g, 100, units='seconds', end=[1.0])
+        mask_in_gaps([1.5], g, 100, units='seconds', gap_units='seconds', end=[1.0])
     with pytest.raises(ValueError):
-        mask_in_gaps([1.5], np.array([[2.0, 1.0]]), 100, units='seconds')
+        mask_in_gaps([1.5], np.array([[2.0, 1.0]]), 100, units='seconds', gap_units='seconds')
     with pytest.raises(ValueError):
-        mask_in_gaps([np.nan], g, 100, units='seconds')
+        mask_in_gaps([np.nan], g, 100, units='seconds', gap_units='seconds')
     with pytest.raises(ValueError):
-        mask_in_gaps([1.5], g, np.nan, units='seconds')
+        mask_in_gaps([1.5], g, np.nan, units='seconds', gap_units='seconds')
     with pytest.raises(ValueError):
-        mask_in_gaps([1.5], np.array([1.0, 2.0, 3.0]), 100, units='seconds')
+        mask_in_gaps([1.5], np.array([1.0, 2.0, 3.0]), 100, units='seconds', gap_units='seconds')
 
 
 def test_drop_in_gaps_points_and_intervals():
     gaps = find_gaps(_with_gaps(np.zeros(5000), [(4.0, 6.0)]))
     assert drop_in_gaps([1.0, 4.5, 5.95, 6.2, 19.0], gaps / FS, FS,
-                        units='seconds').tolist() == [1.0, 6.2, 19.0]
+                        units='seconds', gap_units='seconds').tolist() == [1.0, 6.2, 19.0]
     det = np.array([250, 1100, 1490, 1550], dtype=np.int64)
-    out = drop_in_gaps(det, gaps, FS, units='samples')
+    out = drop_in_gaps(det, gaps, FS, units='samples', gap_units='samples')
     assert out.tolist() == [250, 1550] and out.dtype == np.int64
-    s, e = drop_in_gaps([0.5, 1.5], np.array([[1.0, 2.0]]), 100, units='seconds',
+    s, e = drop_in_gaps([0.5, 1.5], np.array([[1.0, 2.0]]), 100, units='seconds', gap_units='seconds',
                         end=[0.6, 1.6])
     assert s.tolist() == [0.5] and e.tolist() == [0.6]
 
@@ -476,7 +529,7 @@ def test_full_pipeline_example():
     with warnings.catch_warnings():
         warnings.simplefilter('error')
         det = ss.find_peaks(np.abs(_band(y, FS, 10, 60)), distance=int(0.1 * FS))[0]
-    kept = drop_in_gaps(det, gaps, FS, units='samples', margin_s=0.1)
+    kept = drop_in_gaps(det, gaps, FS, units='samples', gap_units='samples', margin_s=0.1)
     assert kept.size > 0
     for s, e in gaps:
         assert not np.any((kept >= s - 0.1 * FS) & (kept < e + 0.1 * FS))
