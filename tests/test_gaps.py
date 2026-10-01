@@ -170,7 +170,7 @@ def test_spectral_fill_matches_neighbour_band_power(gap_s):
     x0 = _brown_white(fs, 120, seed=4)
     bands = [(2, 8), (10, 60), (80, 500), (500, 900)]
     ratios = {b: [] for b in bands}
-    for k, s in enumerate((20.0, 50.0, 80.0)):
+    for k, s in enumerate((15.0, 30.0, 45.0, 60.0, 75.0, 90.0)):
         x = _with_gaps(x0, [(s, s + gap_s)], fs)
         y = fill_gaps(x, fs, seed=k)
         core = slice(int((s + 0.5) * fs), int((s + gap_s - 0.5) * fs))
@@ -179,8 +179,8 @@ def test_spectral_fill_matches_neighbour_band_power(gap_s):
         for b in bands:
             f = _band(y, fs, *b)
             ratios[b].append(np.sqrt(np.mean(f[core] ** 2) / np.mean(f[nb] ** 2)))
-    for b in bands:
-        assert 0.75 < np.median(ratios[b]) < 1.3, (b, ratios[b])
+    for b in bands:      # mean of 6 gaps: 0.94-1.17 over 15 seeds; pink is ~5 at 80-900 Hz
+        assert 0.8 < np.mean(ratios[b]) < 1.25, (b, ratios[b])
     # documented contrast: the fixed 1/f shape puts too much power at high frequencies
     x = _with_gaps(x0, [(50, 50 + gap_s)], fs)
     f = _band(fill_gaps(x, fs, method='pink'), fs, 80, 500)
@@ -239,7 +239,9 @@ def test_separate_calls_with_same_seed_give_independent_noise(method):
     a, b = _two_channels_shared_gap()
     fa, fb = fill_gaps(a, 500, method=method), fill_gaps(b, 500, method=method)
     mid = slice(5300, 9700)
-    assert abs(np.corrcoef(fa[mid], fb[mid])[0, 1]) < 0.3   # was 0.9997 (same noise)
+    # was 0.9997 (identical noise). Independent fills: |corr| <= 0.05 (spectral) and
+    # <= 0.30 (pink, few effective degrees of freedom) over 200 seeds
+    assert abs(np.corrcoef(fa[mid], fb[mid])[0, 1]) < (0.1 if method == 'spectral' else 0.5)
 
 
 def test_channel_fill_independent_of_other_channels_order_and_gaps():
