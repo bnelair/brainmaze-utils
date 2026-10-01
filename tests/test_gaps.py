@@ -215,13 +215,14 @@ def test_spectral_fill_is_robust_to_spikes_in_context():
     fs = 500.0
     x0 = _brown_white(fs, 60, seed=6)
     x = x0.copy()
-    for c in (23.3, 27.9):                                  # two big spikes in the context
+    for c in (21.1, 23.3, 25.4, 27.9):                      # big spikes in the context
         x[int(c * fs):int(c * fs) + 10] += 400.0
     x[int(30 * fs):int(35 * fs)] = np.nan
-    f = _band(fill_gaps(x, fs), fs, 10, 60)
-    core = f[int(30.5 * fs):int(34.5 * fs)]
-    clean = _band(x0, fs, 10, 60)[int(36 * fs):int(46 * fs)]
-    assert np.std(core) < 1.3 * np.std(clean)
+    clean = np.std(_band(x0, fs, 10, 60)[int(36 * fs):int(46 * fs)])
+    r = [np.std(_band(fill_gaps(x, fs, seed=k), fs, 10, 60)[int(30.5 * fs):int(34.5 * fs)])
+         for k in range(4)]
+    # 1.00-1.09 with the rejection, 1.74-1.82 without (scratch/utils-gaps/r3/v3_rules.py)
+    assert np.mean(r) < 1.2 * clean
 
 
 def test_spectral_fill_variance_white_noise():
@@ -229,6 +230,139 @@ def test_spectral_fill_variance_white_noise():
     x[50000:150000] = np.nan
     y = fill_gaps(x, 1000.0)
     assert np.std(y[51000:149000]) == pytest.approx(1.0, rel=0.05)
+
+
+# ---------------------------------------------------------------- round 3 (V1-V5, V8, V10)
+def test_synthesis_has_exact_power_per_bin():
+    """Random-phase synthesis: the mean square equals the requested power (Parseval)."""
+    import brainmaze_utils.gaps as G
+    rng = np.random.default_rng(0)
+    for m in (64, 65):
+        power = rng.random(m // 2 + 1)
+        power[0] = 0.0
+        z = G._synthesize(power, m, rng)
+        assert np.mean(z ** 2) == pytest.approx(power.sum(), rel=1e-9)
+        only_nyq = np.zeros(m // 2 + 1)
+        only_nyq[-1] = 2.0
+        assert np.mean(G._synthesize(only_nyq, m, rng) ** 2) == pytest.approx(
+            2.0 if m % 2 == 0 else 2.0, rel=1e-9)
+
+
+def test_noisy_edges_do_not_inject_low_frequency_power():      # V1
+    """White-dominated data: the edge must not carry one noisy sample's offset into the
+    gap (was 181x the 1-4 Hz power in the first 0.5 s of the fill)."""
+    fs = 500.0
+    x0 = ss.sosfiltfilt(ss.butter(2, 0.5, 'high', fs=fs, output='sos'),
+                        10 * np.random.default_rng(1).standard_normal(int(400 * fs)))
+    starts = np.arange(20, 380, 9.1)
+    y = fill_gaps(_with_gaps(x0, [(a, a + 5) for a in starts], fs), fs)
+    fy, fo = _band(y, fs, 1, 4), _band(x0, fs, 1, 4)
+    w = np.concatenate([np.arange(int(a * fs), int((a + 0.5) * fs)) for a in starts])
+    assert np.mean(fy[w] ** 2) / np.mean(fo[w] ** 2) < 2.0
+    # and nothing leaks into the valid data 0.1-1 s before the gaps
+    leak = [np.max(np.abs(fy[i:i + int(0.9 * fs)] - fo[i:i + int(0.9 * fs)]))
+            for i in (int((a - 1) * fs) for a in starts)]
+    assert np.median(leak) < 1.0 * np.std(fo)               # was 6.1 (p90 16.9)
+
+
+def test_artifact_at_edge_is_not_continued_into_gap():         # V1
+    fs = 500.0
+    x0 = _brown_white(fs, 120, seed=3)
+    sd = np.std(x0)
+    big = []
+    for k, s in enumerate(np.arange(20, 100, 7.7)):
+        x = x0.copy()
+        a, e = int(s * fs), int((s + 5) * fs)
+        x[a - 10:a] += 300 * np.hanning(20)[:10]            # artifact cut by the dropout
+        x[a:e] = np.nan
+        y = fill_gaps(x, fs, seed=k)
+        big.append(np.max(np.abs(y[a:a + int(0.5 * fs)] - np.median(x0[a - 250:a]))) / sd)
+    assert np.median(big) < 6.0                             # was 19.9 (2x the artifact)
+
+
+def test_slow_oscillation_is_not_smeared_into_delta():         # V2
+    fs = 250.0
+    t = np.arange(int(1200 * fs)) / fs
+    x0 = 40 * np.sin(2 * np.pi * 0.75 * t) + 5 * np.random.default_rng(4).standard_normal(t.size)
+    starts = np.arange(100, 1100, 90.0)
+    y = fill_gaps(_with_gaps(x0, [(a, a + 30) for a in starts], fs), fs)
+    core = np.concatenate([np.arange(int((a + 2) * fs), int((a + 28) * fs)) for a in starts])
+
+    def ratio(lo, hi):
+        b = ss.butter(2, [lo, hi], 'bandpass', fs=fs, output='sos')
+        return np.sqrt(np.mean(ss.sosfiltfilt(b, y)[core] ** 2)
+                       / np.mean(ss.sosfiltfilt(b, x0)[core] ** 2))
+    assert 0.7 < ratio(0.6, 1.0) < 1.3                      # was 0.39 (1 s Welch cap)
+    assert ratio(1, 2) < 2.0                                # was 6.5
+    assert ratio(2, 4) < 1.3                                # was 7.4
+
+
+def test_short_gaps_keep_delta_band():                         # 1 s minimum Welch segment
+    """A 0.2 s gap still gets the delta-band continuation of its neighbours (the spectrum
+    model includes it; with a 0.25 s Welch segment it had none: 0.36)."""
+    fs = 250.0
+    x0 = _brown_white(fs, 400, seed=12)
+    st = np.arange(20, 380, 6.1)
+    f = _band(fill_gaps(_with_gaps(x0, [(a, a + 0.2) for a in st], fs), fs), fs, 0.5, 4)
+    r = []
+    for a in st:
+        s, e = int(a * fs), int(a * fs) + int(0.2 * fs)
+        nb = np.r_[np.arange(s - int(10 * fs), s - int(fs)), np.arange(e + int(fs), e + int(10 * fs))]
+        r.append(np.sqrt(np.mean(f[s + 12:e - 12] ** 2) / np.mean(f[nb] ** 2)))
+    assert np.median(r) > 0.47                              # 0.57 (0.36 without)
+
+
+def test_bursts_in_context_are_not_rejected_as_artifacts():    # V3
+    fs = 500.0
+    T = 600
+    t = np.arange(int(T * fs)) / fs
+    r = np.random.default_rng(2)
+    env = np.zeros(t.size)
+    for c in np.arange(1, T - 2, 6.0) + r.uniform(0, 3, int(np.ceil((T - 3) / 6.0))):
+        i0, m = int(c * fs), int(1.0 * fs)
+        if i0 + m <= env.size:
+            env[i0:i0 + m] = np.hanning(m)
+    x0 = _brown_white(fs, T, seed=21) + 50 * env * np.sin(2 * np.pi * 13 * t)   # spindles
+    num = den = 0.0
+    for k, s in enumerate(np.arange(15, T - 16, 13.0)):
+        a, e = int(s * fs), int((s + 1) * fs)
+        y = fill_gaps(_with_gaps(x0, [(s, s + 1)], fs), fs, seed=k)
+        fy, fo = _band(y, fs, 11, 15), _band(x0, fs, 11, 15)
+        num += np.mean(fy[a + 125:e - 125] ** 2)
+        den += np.mean(np.r_[fo[a - 5000:a], fo[e:e + 5000]] ** 2)
+    # 0.93 with the two-band rule; 0.66 with "any band > 3 MAD" (v3_rules.py)
+    assert np.sqrt(num / den) > 0.85
+
+
+def test_interpolated_short_gaps_do_not_bias_context():        # V5
+    fs = 1000.0
+    x0 = np.random.default_rng(5).standard_normal(int(200 * fs))
+    x = x0.copy()
+    for a in np.arange(1, 199, 0.1):                        # 50 % packet loss, 0.05 s each
+        x[int(a * fs):int((a + 0.05) * fs)] = np.nan
+    starts = np.arange(20, 180, 20.0)
+    for a in starts:
+        x[int(a * fs):int((a + 2) * fs)] = np.nan
+    y = fill_gaps(x, fs)
+    core = np.concatenate([np.arange(int((a + 0.3) * fs), int((a + 1.7) * fs)) for a in starts])
+    f = _band(y, fs, 100, 400)
+    ref = _band(x0, fs, 100, 400)
+    assert np.sqrt(np.mean(f[core] ** 2) / np.mean(ref ** 2)) > 0.9    # was 0.70
+
+
+def test_fill_is_invariant_to_ulps_offset_and_units():         # V8
+    x0 = _brown_white(500.0, 120, seed=8)
+    x = _with_gaps(x0, [(50, 55)], 500.0)
+    y = fill_gaps(x, 500.0)[25000:27500]
+    x1 = x.copy()
+    x1[24000] = np.nextafter(x1[24000], np.inf)             # 1 ulp in the context
+    assert np.allclose(fill_gaps(x1, 500.0)[25000:27500], y)
+    x2 = np.r_[np.random.default_rng(1).standard_normal(10000), x]   # 20 s later
+    assert np.allclose(fill_gaps(x2, 500.0)[35000:37500], y)
+    assert np.allclose(fill_gaps(x * 1e-6, 500.0)[25000:27500] * 1e6, y)   # V vs uV
+    y3 = fill_gaps(_with_gaps(x0, [(50, 55), (80, 85)], 500.0), 500.0)  # other gap: other noise
+    f3 = _band(y3, 500.0, 10, 60)
+    assert abs(np.corrcoef(f3[25200:27300], f3[40200:42300])[0, 1]) < 0.1
 
 
 # ---------------------------------------------------------------- R3: randomness
@@ -322,6 +456,8 @@ def test_long_gap_edges_continue_value_and_slope(method):
         assert abs(y[i - 1] - 2 * y[i] + y[i + 1]) < 3 * d2_data
     assert (y[s] - y[s - 1]) == pytest.approx(x0[s - 1] - x0[s - 2], rel=0.05)
     assert (y[e] - y[e - 1]) == pytest.approx(x0[e + 1] - x0[e], rel=0.05)
+    # no step where the edge conditioning ends inside a long gap (faded out, not cut)
+    assert np.max(np.abs(np.diff(y[s - 1:e + 1]))) < 3 * np.max(np.abs(np.diff(x0)))
 
 
 def test_taper_does_not_dip_band_power():
@@ -349,7 +485,9 @@ def test_mirror_does_not_overshoot_coherent_line():
         x[a:b] = np.nan
         f = _band(fill_gaps(x, fs, method='mirror'), fs, 55, 65)
         rat.append(np.std(f[a + 100:b - 100]) / np.std(f[a - 5000:a - 500]))
-    assert np.median(rat) < 1.25                            # up to 1.48 without correction
+    # 0.98 with the correlation-aware correction; 1.20 with rho ignored (the pre-R7
+    # sqrt-compensation), up to 1.48 without any (scratch/review-utils26-round2/a9_mirror_test)
+    assert np.median(rat) < 1.1
 
 
 # ---------------------------------------------------------------- R8: all-NaN channels

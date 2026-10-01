@@ -165,6 +165,7 @@ Limitations
 - A channel that is entirely NaN/inf cannot be filled; see ``all_nan``.
 """
 
+import functools
 import hashlib
 import numbers
 import warnings
@@ -231,8 +232,8 @@ def find_gaps(x):
     -------
     np.ndarray, shape (n_gaps, 2), int64
         ``[start, stop)`` **sample indices** of each run (``stop`` exclusive), in order.
-        Use them in :func:`mask_in_gaps` / :func:`drop_in_gaps` with ``units='samples'``,
-        or divide by ``fs`` for ``units='seconds'``.
+        Use them in :func:`mask_in_gaps` / :func:`drop_in_gaps` with
+        ``gap_units='samples'``.
     """
     x = np.asarray(x)
     if x.ndim != 1:
@@ -244,7 +245,7 @@ def find_gaps(x):
 def gap_intervals(x, fs):
     """
     Gaps of a 1-D signal as ``[start, stop)`` **times in seconds**, shape (n_gaps, 2),
-    float64. Use them with ``units='seconds'`` in :func:`mask_in_gaps` /
+    float64. Use them with ``gap_units='seconds'`` in :func:`mask_in_gaps` /
     :func:`drop_in_gaps`.
     """
     return find_gaps(x) / _check_fs(fs)
@@ -301,28 +302,40 @@ def _nperseg(n, fs, ctx):
     return int(max(16, min(max(p2(n, np.ceil), lo), cap)))
 
 
-def _segments(ctxs, nps):
+def _prep_context(ctxs):
+    """[(values, ok)] -> [(values, cumsum of non-finite, cumsum of not-ok)] (computed once)."""
+    out = []
+    for c, ok in ctxs:
+        out.append((c, np.r_[0, np.cumsum(~np.isfinite(c))], np.r_[0, np.cumsum(~ok)]))
+    return out
+
+
+def _segments(prep, nps):
     """
-    Half-overlapping Welch segments of the context pieces ``ctxs`` = [(values, ok), ...]
-    (``ok``: original, never-filled samples). Returns (segments, pure): only segments
-    without non-finite samples; ``pure`` marks those made only of original samples.
+    Half-overlapping Welch segments of the prepared context pieces (``_prep_context``).
+    Returns (segments, pure): only segments without non-finite samples; ``pure`` marks
+    those made only of original (never filled or interpolated) samples.
     """
     segs, pure = [], []
     step = max(nps // 2, 1)
-    for c, ok in ctxs:
+    for c, nf, nb in prep:
         if c.size < nps:
             continue
         st = np.arange(0, c.size - nps + 1, step)
-        nf = np.r_[0, np.cumsum(~np.isfinite(c))]
-        nb = np.r_[0, np.cumsum(~ok)]
-        fin = (nf[st + nps] - nf[st]) == 0
-        st = st[fin]
+        st = st[(nf[st + nps] - nf[st]) == 0]
         if st.size:
             segs.append(c[st[:, None] + np.arange(nps)])
             pure.append((nb[st + nps] - nb[st]) == 0)
     if not segs:
         return np.zeros((0, nps)), np.zeros(0, dtype=bool)
     return np.concatenate(segs), np.concatenate(pure)
+
+
+@functools.lru_cache(maxsize=32)
+def _hann(nps):
+    w = _ss.get_window('hann', nps)
+    w.setflags(write=False)
+    return w
 
 
 def _keep_segments(lb):
@@ -350,7 +363,7 @@ def _cum_power(seg, fs):
     (0, f] (DC excluded).
     """
     nps = seg.shape[1]
-    win = _ss.get_window('hann', nps)
+    win = _hann(nps)
     spec = np.fft.rfft((seg - seg.mean(axis=1, keepdims=True)) * win, axis=1)
     pw = spec.real ** 2 + spec.imag ** 2
     if seg.shape[0] > 2:
@@ -377,30 +390,49 @@ def _cum_power(seg, fs):
     return np.r_[0.0, upper], np.r_[0.0, np.cumsum(p * width)]
 
 
+def _interp_fn(ec):
+    edges, cum = ec
+    return lambda f: np.interp(f, edges, cum)
+
+
 def _context_psd(ctxs, nps, fs):
     """
-    (edges, cum) of the context, or None if there are fewer than ``_MIN_SPECTRAL_CONTEXT``
-    valid samples. Prefers Welch segments made only of original samples (interpolated short
-    gaps and earlier fills have no high-frequency power and would bias the estimate low);
-    falls back to segments containing filled samples, then to shorter segments, then to the
-    concatenated valid samples.
+    Cumulative power function ``F(f)`` (variance in (0, f]) of the context, or None if
+    there are fewer than ``_MIN_SPECTRAL_CONTEXT`` valid samples.
+
+    Uses Welch segments made only of ORIGINAL samples when there are >= 3 of them.
+    Interpolated short gaps and earlier fills have (almost) no high-frequency power, so
+    when the context is riddled with them (packet loss) the spectrum is pieced together:
+    below ``2 fs / k`` from the segments that include filled samples, above it from the
+    longest segments (length k) that are made of original samples only.
     """
-    while True:
-        seg, pure = _segments(ctxs, nps)
-        if pure.sum() >= 3:
-            return _cum_power(seg[pure], fs)
-        if seg.shape[0] >= 3 or (seg.shape[0] and nps <= 16):
-            return _cum_power(seg, fs)
-        if nps <= 16:
-            break
+    prep = _prep_context(ctxs)
+    seg, pure = _segments(prep, nps)
+    while pure.sum() < 3 and seg.shape[0] < 3 and nps > 16:
         nps //= 2
+        seg, pure = _segments(prep, nps)
+    if pure.sum() >= 3:
+        return _interp_fn(_cum_power(seg[pure], fs))
+    if seg.shape[0]:
+        lo_fn = _interp_fn(_cum_power(seg, fs))
+        k = nps // 2
+        while k >= 16:
+            s2, p2 = _segments(prep, k)
+            if p2.sum() >= 3:
+                hi_fn = _interp_fn(_cum_power(s2[p2], fs))
+                f0 = 2.0 * fs / k
+                c0, h0 = float(lo_fn(f0)), float(hi_fn(f0))
+                return lambda f: np.where(f <= f0, lo_fn(np.minimum(f, f0)),
+                                          c0 + hi_fn(f) - h0)
+            k //= 2
+        return lo_fn
     c = np.concatenate([v[ok] for v, ok in ctxs])
     if c.size < _MIN_SPECTRAL_CONTEXT:
         return None
     nps = int(min(nps, c.size))
     step = max(nps // 2, 1)
     st = np.arange(0, c.size - nps + 1, step)
-    return _cum_power(c[st[:, None] + np.arange(nps)], fs)
+    return _interp_fn(_cum_power(c[st[:, None] + np.arange(nps)], fs))
 
 
 def _bin_power(m, fs, cum_fn):
@@ -577,7 +609,8 @@ def _conditioned_noise(power, m, n, y_left, y_right, base_ext, clip, W, rng):
     Y = power.copy()
     if m % 2 == 0:
         Y[-1] *= 2.0
-    R = np.fft.irfft(Y, m) * (m / 2.0)          # circular autocovariance of z
+    R = np.fft.irfft(Y, m)                      # circular autocovariance of z / (m / 2)
+    R *= m / 2.0
     obs = np.r_[np.arange(pl), np.arange(pl + n, pl + n + pr)]       # positions in z
     d = np.r_[y_left, y_right] - base_ext(obs - pl)
     if clip > 0:
@@ -588,19 +621,20 @@ def _conditioned_noise(power, m, n, y_left, y_right, base_ext, clip, W, rng):
         a = np.linalg.solve(C, d - z[obs])
     except np.linalg.LinAlgError:
         a = np.linalg.lstsq(C, d - z[obs], rcond=None)[0]
-    spikes = np.zeros(m)
-    spikes[obs] = a
-    corr = np.fft.irfft(np.fft.rfft(spikes) * Y, m)[pl:pl + n] * (m / 2.0)   # R * spikes
     out = z[pl:pl + n]
     full = (n <= 2 * W) if (pl and pr) else (n <= W)
-    if full:
-        return out + corr
+    if full:                                    # correction R * a over the whole gap (FFT)
+        del R
+        spikes = np.zeros(m)
+        spikes[obs] = a
+        corr = np.fft.irfft(np.fft.rfft(spikes) * Y, m)[pl:pl + n]
+        return out + corr * (m / 2.0)
     h = W // 2
     fade = np.r_[np.ones(h), 0.5 * (1.0 + np.cos(np.pi * np.arange(1, W - h + 1) / (W - h + 1.0)))]
-    if pl:
-        out[:W] += fade * corr[:W]
-    if pr:
-        out[n - W:] += fade[::-1] * corr[n - W:]
+    regions = ([np.arange(W)] if pl else []) + ([np.arange(n - W, n)] if pr else [])
+    fades = ([fade] if pl else []) + ([fade[::-1]] if pr else [])
+    for t, f in zip(regions, fades):            # long gap: only the edge regions (gather)
+        out[t] += f * (R[np.abs((t + pl)[:, None] - obs[None, :])] @ a)
     return out
 
 
@@ -649,8 +683,7 @@ def _fill_long(y, ok, s, e, nxt, fs, p, root):
     if method == 'spectral':
         cum = _context_psd([(ctx_l, ok_l), (ctx_r, ok_r)], nps, fs)
     if cum is not None:
-        edges, cumv = cum
-        power = _bin_power(m, fs, lambda f: np.interp(f, edges, cumv))
+        power = _bin_power(m, fs, cum)
     else:                                   # 'pink', or 'spectral' with too little context
         k = np.arange(m // 2 + 1, dtype=float)
         power = np.zeros(k.size)
@@ -709,18 +742,21 @@ def fill_gaps(x, fs, *, max_interp_s=0.1, method='spectral', context_s=30.0, tap
         detectors).
     context_s : float
         Maximum seconds of valid data used on each side of a long gap (spectrum, level,
-        amplitude, mirror images). ``'spectral'`` uses less for shorter gaps.
+        amplitude, mirror images). Default 30 s. ``'spectral'`` uses less for shorter
+        gaps (about 16 gap lengths, at least three ~1 s Welch segments).
     taper_s : float
-        ``'spectral'``/``'pink'``: length (seconds) of the smooth transition from the odd
-        reflection of the data into the noise at each edge (capped at half the gap).
-        0 disables it (the noise then starts with a step; not recommended).
+        ``'spectral'``/``'pink'``: how far (seconds) into the gap the fill is conditioned
+        on the data at each edge (the whole gap if it is shorter than ``2 * taper_s``;
+        faded out over the second half). Default 0.5 s. 0 disables the conditioning (the
+        noise then starts with a step; not recommended).
     beta : float
         Spectral exponent for ``'pink'`` (and for the ``'spectral'`` fallback when fewer
         than 16 valid context samples exist).
     seed : None, int, sequence of int, SeedSequence or Generator
         Root of the per-gap random streams (see "Randomness" in the module docstring).
         Default 0: reproducible. A gap's noise depends only on the seed, the gap's
-        position and the data next to it.
+        length and the data next to it (quantised to 1/1000 of its robust SD), not on
+        its position in the array.
     axis : int
         Time axis for N-D input; every other index is a channel, filled independently.
     all_nan : {'keep', 'zero', 'raise'}
