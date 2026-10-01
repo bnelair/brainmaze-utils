@@ -113,24 +113,24 @@ a synthetic 1/f^2 + 10 Hz + 60 Hz + white background at 5 kHz (probes and full t
 brainmaze-utils PR #26):
 
 - band RMS of the fill / band RMS of the neighbouring data, median over gaps, bands from
-  0.5 Hz to 1 kHz: ``'spectral'`` 0.94-1.14 for 10-60 s gaps and 0.74-1.21 for 1-2 s gaps
-  (the scatter of a short realisation; the 80-1000 Hz bands stay within 0.92-1.01 at every
-  length). ``'pink'``: 1.3-2.1 in 4-200 Hz on real data and about 5 in 80-1000 Hz at
-  5 kHz, because its 1/f shape is fixed;
+  0.5 Hz to 1 kHz: ``'spectral'`` 0.92-1.05 for 10-60 s gaps and 0.74-1.25 for 1-2 s
+  gaps (the scatter of a short realisation in narrow low bands; 10-1000 Hz bands stay
+  within 0.89-1.03 at every length). ``'pink'``: 1.3-2.1 in 4-200 Hz on real data and
+  about 5 in 80-1000 Hz at 5 kHz, because its 1/f shape is fixed;
 - an RMS (80-500 Hz, 10 s window) background threshold in the *valid* data 0.1-4 s
   outside a gap, filled / gap-free: ``'spectral'`` 1.00 and ``'mirror'`` 0.99-1.00 for
-  0.5, 2 and 10 s gaps; ``'pink'`` 1.35 / 2.30 / 2.74, i.e. an RMS-threshold detector
+  0.5, 2 and 10 s gaps; ``'pink'`` 1.34 / 2.28 / 2.77, i.e. an RMS-threshold detector
   misses real events next to a pink-filled gap;
 - eeg_forge's Janca threshold 0.1-2.5 s outside a gap, filled / gap-free (0.2-60 s gaps):
-  ``'spectral'`` median 1.00-1.03, p90 <= 1.06; ``'mirror'`` p90 <= 1.04; ``'pink'``
+  ``'spectral'`` median 0.98-1.00, p90 <= 1.07; ``'mirror'`` p90 <= 1.04; ``'pink'``
   p90 up to 1.19;
-- Janca detections (1 h, 23 gaps per length, transients injected 0.15-1.2 s outside both
-  edges, ``drop_in_gaps`` margin 0.1 s): no false detections near the gaps for
-  ``'spectral'``, ``'pink'`` or ``'mirror'`` (``'linear'``: 9-415). With strong
-  transients all three find 100 %; with weak ones (near the threshold) the sensitivity
-  at 0.15-1.2 s from the edge, gap-free = 0.76-0.91, is 0.67-0.86 for ``'spectral'``,
-  0.65-0.79 for ``'mirror'`` (it copies the transients into the gap, raising the
-  background) and 0.35-0.65 for ``'pink'``.
+- Janca detections (1 h, 23 gaps per length, 0.5-60 s, transients injected 0.15-1.2 s
+  outside both edges, ``drop_in_gaps`` margin 0.1 s): no false detections near the gaps
+  for ``'spectral'``, ``'pink'`` or ``'mirror'`` (``'linear'``: 9-415). With strong
+  transients all three find 100 %. With weak ones (near the threshold) the sensitivity at
+  0.15 s from the edge is 0.74-0.91 gap-free, 0.65-0.76 with ``'spectral'``, 0.41-0.78
+  with ``'mirror'`` (it copies the transients into the gap, raising the background) and
+  0.26-0.67 with ``'pink'``.
 
 ``'spectral'`` is the default because it is the only fill that keeps the background of
 the neighbouring data in every band without copying neighbouring events (spikes,
