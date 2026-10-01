@@ -103,7 +103,8 @@ def _decimated_nan_mask(nans, fs, fs_new, n_new):
     samples at ``fs_new`` (output sample ``k`` sits at time ``k / fs_new``).
 
     Output sample ``k`` is flagged if **any** input sample within half an output
-    sample period (``+-0.5 / fs_new``) of its time stamp is NaN.
+    sample period (``+-0.5 / fs_new``) of its time stamp is NaN, or if one of the two
+    input samples bracketing its time stamp is NaN.
     """
     n = nans.shape[1]
     out = np.zeros((nans.shape[0], n_new), dtype=bool)
@@ -117,78 +118,125 @@ def _decimated_nan_mask(nans, fs, fs_new, n_new):
     hi = np.clip(np.floor((t + 0.5 / fs_new) * fs + 1e-9).astype(np.int64) + 1, 0, n)
     hi = np.maximum(hi, np.minimum(lo + 1, n))
     out = (csum[:, hi] - csum[:, lo]) > 0
+    # the two input samples bracketing each output time are always included (matters
+    # when upsampling, where the +-0.5 / fs_new window may contain no input sample)
+    pos = np.minimum(np.arange(n_new) * fs / fs_new, n - 1)
+    i_lo = np.clip(np.floor(pos + 1e-9).astype(np.int64), 0, n - 1)
+    i_hi = np.clip(np.ceil(pos - 1e-9).astype(np.int64), 0, n - 1)
+    out |= nans[:, i_lo] | nans[:, i_hi]
     return out
 
 
-def _rational_ratio(fs, fs_new, n, max_term=50000):
-    """
-    ``fs_new / fs`` as a fraction ``up / down`` for polyphase resampling.
-
-    The ratio is taken from the decimal representation of the two rates (e.g.
-    32556 Hz -> 1000 Hz gives 250 / 8139 exactly). If that needs terms larger than
-    ``max_term``, the closest fraction with smaller terms is used only if the timing
-    error it causes stays below 0.01 output samples at the end of the record;
-    otherwise ``ValueError`` is raised (a silently time-stretched output is worse).
-    """
-    from fractions import Fraction
-    exact = Fraction(repr(float(fs_new))) / Fraction(repr(float(fs)))
-    if exact.numerator <= max_term and exact.denominator <= max_term:
-        return exact
-    frac = exact.limit_denominator(max_term)
-    n_out = n * fs_new / fs
-    drift = abs(float(frac) / float(exact) - 1) * n_out  # in output samples
-    if drift > 0.01:
-        raise ValueError(
-            f'decimate: cannot represent fs_new/fs = {fs_new!r}/{fs!r} as a small rational '
-            f'(best approximation {frac} would shift the last sample by {drift:.3g} samples); '
-            'round fs to a value with fewer decimals or resample in two steps')
-    return frac
+# exact-time band-limited interpolation (used by decimate for non-integer ratios and upsampling)
+_INTERP_ATTEN_DB = 120.0   # Kaiser design target: ~1e-6 relative error for content inside the band
+_INTERP_MAX_BAND = 0.45    # widest band (relative to the input rate) the interpolator preserves
+_INTERP_PHASES = 4096      # kernel table resolution (linear interpolation between phases)
 
 
-def _downsample_filtered(x, fs, fs_new, n_new):
+def _interp_kernel(band):
     """
-    Pick samples at times ``k / fs_new`` from an already low-passed signal
-    ``(n_signals, n_samples)``. Integer ratios use exact sample picking; non-integer
-    ratios use polyphase resampling (:func:`scipy.signal.resample_poly`).
+    Kaiser-windowed sinc reconstruction kernel for content up to ``band`` (relative to
+    the input rate, ``<= _INTERP_MAX_BAND``).
+
+    Returns ``(W, taps, table)``: half-width ``W`` in input samples, tap offsets
+    ``-W+1 .. W`` and the (unnormalised) kernel sampled at ``_INTERP_PHASES + 1``
+    fractional positions ``0 .. 1``. The transition band is ``[band, 1 - band]``
+    (images of the content start at ``1 - band``), and the window is designed for
+    ``_INTERP_ATTEN_DB`` attenuation (Kaiser's formula).
     """
-    ratio = fs / fs_new
-    if abs(ratio - round(ratio)) < 1e-9:
-        q = int(round(ratio))
-        y = x[:, ::q]
-    else:
-        frac = _rational_ratio(fs, fs_new, x.shape[1])
-        y = signal.resample_poly(x, frac.numerator, frac.denominator, axis=1, padtype='line')
-    if y.shape[1] >= n_new:
-        return y[:, :n_new]
-    # can only happen for non-integer ratios when rounding gives one more sample
-    pad = np.repeat(y[:, -1:], n_new - y.shape[1], axis=1)
-    return np.concatenate((y, pad), axis=1)
+    from scipy.special import i0
+    band = min(max(band, 0.0), _INTERP_MAX_BAND)
+    d_omega = 2 * np.pi * (1.0 - 2.0 * band)
+    n_taps = (_INTERP_ATTEN_DB - 7.95) / (2.285 * d_omega) + 1
+    W = max(2, int(np.ceil(n_taps / 2)))
+    beta = 0.1102 * (_INTERP_ATTEN_DB - 8.7)
+    taps = np.arange(-W + 1, W + 1)
+    frac = np.arange(_INTERP_PHASES + 1) / _INTERP_PHASES
+    t = frac[:, None] - taps[None, :]  # distance between output time and tap, in input samples
+    u = np.clip(1.0 - (t / W) ** 2, 0.0, None)
+    table = np.sinc(t) * i0(beta * np.sqrt(u)) / i0(beta)
+    return W, taps, table
+
+
+def _odd_extend(x, m):
+    """Extend 2-D ``x`` by ``m`` samples at both ends of the last axis by odd (point) reflection."""
+    n = x.shape[1]
+    if n < 2:
+        return np.repeat(x, 2 * m + 1, axis=1)
+    r = min(m, n - 1)
+    head = 2 * x[:, :1] - x[:, r:0:-1]
+    tail = 2 * x[:, -1:] - x[:, -2:-r - 2:-1]
+    if r < m:
+        head = np.concatenate((np.repeat(head[:, :1], m - r, axis=1), head), axis=1)
+        tail = np.concatenate((tail, np.repeat(tail[:, -1:], m - r, axis=1)), axis=1)
+    return np.concatenate((head, x, tail), axis=1)
+
+
+def _interp_exact_times(x, fs, fs_new, n_new, band):
+    """
+    Evaluate the band-limited signal ``x`` ``(n_signals, n_samples)`` sampled at ``fs``
+    at the exact times ``k / fs_new``, ``k = 0 .. n_new - 1``.
+
+    Each output value is a Kaiser-windowed sinc interpolation over ``2 * W`` input
+    samples (see :func:`_interp_kernel`), weights normalised to sum to 1. Positions are
+    computed per sample as ``k * fs / fs_new``, so there is no cumulative timing drift
+    (float64: < 1e-6 samples even for days of data). The record is extended by odd
+    reflection at both ends, which also covers output times up to one input period
+    after the last input sample (upsampling).
+    """
+    n = x.shape[1]
+    W, taps, table = _interp_kernel(band)
+    pad = W + 1
+    xp = _odd_extend(x, pad)
+    out = np.empty((x.shape[0], n_new))
+    block = max(1, (1 << 22) // (2 * W * max(1, x.shape[0])))
+    for s in range(0, n_new, block):
+        e = min(n_new, s + block)
+        # output times may lie up to one input period past the last sample when
+        # upsampling; the odd extension covers that (no clamping to the last value)
+        p = np.minimum(np.arange(s, e, dtype=float) * fs / fs_new, float(n))
+        ib = np.floor(p).astype(np.int64)
+        q = (p - ib) * _INTERP_PHASES
+        qi = np.minimum(np.floor(q).astype(np.int64), _INTERP_PHASES - 1)
+        a = (q - qi)[:, None]
+        w = table[qi] * (1.0 - a) + table[qi + 1] * a
+        w /= w.sum(axis=1, keepdims=True)
+        idx = ib[:, None] + taps[None, :] + pad
+        out[:, s:e] = np.einsum('ckj,kj->ck', xp[:, idx], w)
+    return out
 
 
 def decimate(x, fs, fs_new, cutoff=None, datarate=False):
     """
-    Downsample signal(s) with a zero-phase anti-aliasing low-pass filter. NaN-aware.
+    Resample signal(s) to ``fs_new`` with a zero-phase anti-aliasing low-pass filter.
+    NaN-aware. Despite the name it also upsamples (``fs_new > fs``).
 
     Processing steps, per signal:
 
     1. NaN samples are temporarily filled by linear interpolation between the
        neighbouring valid samples (leading/trailing NaNs take the nearest valid
        value) so the filter does not see steps at gap edges.
-    2. Zero-phase low-pass: 16th-order Butterworth in second-order sections,
-       applied forward and backward (:func:`scipy.signal.sosfiltfilt`); the
-       magnitude response is therefore that of a 32nd-order filter with
-       -6 dB at ``cutoff``.
-    3. Downsampling to ``n_new = round(n_samples * fs_new / fs)`` samples placed at
-       ``k / fs_new`` s. Integer ratios ``fs / fs_new`` pick every ``q``-th sample
-       exactly; non-integer ratios use :func:`scipy.signal.resample_poly` with the
-       exact rational ratio of the two rates as written in decimal (e.g. 32556 ->
-       1000 Hz uses 250/8139), so output sample ``k`` is at ``k / fs_new`` s with no
-       drift over long records. If the ratio has no small exact fraction (e.g. a rate
-       with many decimals) and the best approximation would shift the last sample by
-       more than 0.01 samples, ``ValueError`` is raised.
+    2. Zero-phase low-pass at ``cutoff``: 16th-order Butterworth in second-order
+       sections, applied forward and backward (:func:`scipy.signal.sosfiltfilt`); the
+       magnitude response is therefore that of a 32nd-order filter with -6 dB at
+       ``cutoff``. When upsampling it is skipped if ``cutoff >= 0.45 * fs``: the
+       input holds nothing above ``fs / 2``, and the interpolator (step 3) already
+       band-limits to ``0.45 * fs``.
+    3. Output sample ``k`` is the filtered signal at time exactly ``k / fs_new`` s;
+       the output has ``n_new = round(n_samples * fs_new / fs)`` samples.
+
+       - Integer ratios ``fs / fs_new`` pick every ``q``-th sample (exact).
+       - Any other ratio, including upsampling and rates with decimals such as
+         30000.5 or 511.9999 Hz, evaluates the band-limited signal at the exact times
+         with a Kaiser-windowed sinc interpolator (2 x 5 to 2 x 40 taps, designed for
+         120 dB). The position of every output sample is computed directly from
+         ``k * fs / fs_new``, so there is **no timing drift**, however long the record
+         (timing error < 1e-6 samples). Interpolation error for content inside the
+         band is ~1e-7 of its amplitude (measured on tones; the integer path is
+         exact).
     4. The NaN mask is re-applied: an output sample is NaN if any input sample
-       within ``+-0.5 / fs_new`` s of it was NaN. Signals that are entirely NaN
-       stay entirely NaN.
+       within ``+-0.5 / fs_new`` s of it, or one of the two input samples bracketing
+       it, was NaN. Signals that are entirely NaN stay entirely NaN.
 
     Parameters
     ----------
@@ -196,25 +244,39 @@ def decimate(x, fs, fs_new, cutoff=None, datarate=False):
         ``(n_samples,)`` or ``(n_signals, n_samples)`` - samples along the last axis.
         Not modified.
     fs : float
-        Sampling frequency of ``x`` in Hz.
+        Sampling frequency of ``x`` in Hz (``> 0``).
     fs_new : float
-        Target sampling frequency in Hz. Must satisfy ``0 < fs_new <= fs``.
+        Target sampling frequency in Hz (``> 0``). May be lower, equal or higher
+        than ``fs``.
     cutoff : float, optional
         Anti-aliasing cutoff in Hz. Default ``fs_new / 3`` (two thirds of the new
-        Nyquist frequency). Must be ``< fs / 2``.
+        Nyquist frequency). When downsampling it must satisfy
+        ``0 < cutoff < fs_new / 2``; a higher cutoff would let content above the new
+        Nyquist frequency alias into the output. When upsampling it must be ``> 0``;
+        if it is ``>= 0.45 * fs`` no filter is applied.
     datarate : bool
         If ``True``, also return :func:`get_datarate` of the **input**.
 
     Returns
     -------
     numpy.ndarray or tuple
-        Decimated signal(s) with the same number of dimensions as ``x`` (``float64``),
-        or ``(decimated, datarate)`` if ``datarate=True``.
+        Resampled signal(s) with the same number of dimensions as ``x``
+        (``float64``), or ``(resampled, datarate)`` if ``datarate=True``.
+
+    Raises
+    ------
+    ValueError
+        If ``fs`` or ``fs_new`` is not positive, if ``cutoff`` is outside the range
+        given above, or if ``x`` has more than 2 dimensions.
 
     Notes
     -----
-    - If ``fs_new == fs`` the input is returned unchanged (as a float copy); no
-      filtering is applied.
+    - ``fs_new == fs`` still applies the low-pass at ``cutoff`` (as in v2.0.0).
+    - Upsampling: with the default cutoff the low-pass is applied only for ratios
+      ``fs_new / fs < 1.35`` (where ``fs_new / 3 < 0.45 * fs``); v2.0.0 applied it up
+      to 1.5, returned NaN between ~1.45 and 1.5 and raised above. The
+      interpolator preserves content up to ``0.45 * fs`` (or ``1.25 * cutoff``, if
+      lower); content between ``0.45 * fs`` and ``fs / 2`` is attenuated.
     - Samples close to (but outside) a NaN gap are computed from the interpolated
       fill and the filter's impulse response, so a few output samples next to a gap
       may carry a small transient; they are not masked.
@@ -226,25 +288,34 @@ def decimate(x, fs, fs_new, cutoff=None, datarate=False):
        Filter is now applied in second-order sections; the previous ``(b, a)``
        16th-order design was numerically unstable for ``fs / fs_new >= ~10`` and
        returned all-NaN output (e.g. 3000->250, 1000->50, 32000->1000 Hz). NaNs are
-       now re-applied to the output instead of being silently filled.
+       now re-applied to the output instead of being silently filled. The final
+       resampling step no longer uses the FFT (:func:`scipy.signal.resample`, which
+       assumes a periodic signal and wraps the end of the record into its start); it
+       picks samples (integer ratios) or interpolates at exact times. Upsampling by
+       ratios ``>= 1.5`` used to raise in the filter design and now works. A
+       ``cutoff`` at or above the new Nyquist frequency when downsampling now raises
+       ``ValueError`` (it used to alias silently).
     """
     return_datarate = datarate is True
     x = np.array(x, dtype=float)  # copy, also promotes ints
 
-    if fs_new <= 0 or fs <= 0:
+    if not (fs > 0 and fs_new > 0):
         raise ValueError(f'fs and fs_new must be > 0, got fs={fs!r}, fs_new={fs_new!r}')
-    if fs_new > fs:
-        raise ValueError(f'decimate only downsamples (fs_new={fs_new!r} > fs={fs!r}); use resample() to upsample')
 
     dr = get_datarate(x) if return_datarate else None
 
-    if fs_new == fs:
-        return (x, dr) if return_datarate else x
-
+    downsampling = fs_new <= fs
     if cutoff is None:
         cutoff = fs_new / 3  # two thirds of the new Nyquist
-    if not 0 < cutoff < fs / 2:
-        raise ValueError(f'cutoff must be in (0, fs/2), got {cutoff!r} for fs={fs!r}')
+    if not cutoff > 0:
+        raise ValueError(f'cutoff must be > 0, got {cutoff!r}')
+    if downsampling and not cutoff < fs_new / 2:
+        raise ValueError(
+            f'cutoff={cutoff!r} Hz must be below the new Nyquist frequency fs_new/2 = {fs_new / 2!r} Hz; '
+            'content above it would alias into the output')
+    # when upsampling, a cutoff at/above the interpolator's band (0.45 fs) is pointless: a
+    # Butterworth that close to Nyquist only adds error (v2.0.0 returned NaN there)
+    apply_filter = cutoff < fs / 2 if downsampling else cutoff < _INTERP_MAX_BAND * fs
 
     b_multiple_signals = x.ndim != 1
     if x.ndim == 1:
@@ -252,24 +323,40 @@ def decimate(x, fs, fs_new, cutoff=None, datarate=False):
     if x.ndim != 2:
         raise ValueError(f'x must be 1-D or 2-D, got shape {x.shape}')
 
+    n = x.shape[1]
+    n_new = int(np.round((fs_new / fs) * n))
+    if n == 0 or n_new == 0:
+        y = np.zeros((x.shape[0], n_new))
+        y[:] = np.nan
+        y = y if b_multiple_signals else y[0]
+        return (y, dr) if return_datarate else y
+
     nans = np.isnan(x)
     _fill_nans_linear(x)
 
-    sos = signal.butter(16, cutoff, 'lp', fs=fs, output='sos')
-    # long odd-extension padding (~6 cutoff periods) keeps edge transients small
-    padlen = int(min(x.shape[1] - 1, np.ceil(6 * fs / cutoff)))
-    x = signal.sosfiltfilt(sos, x, axis=1, padlen=padlen)
+    if apply_filter:
+        sos = signal.butter(16, cutoff, 'lp', fs=fs, output='sos')
+        # long odd-extension padding (~6 cutoff periods) keeps edge transients small
+        padlen = int(min(n - 1, max(np.ceil(6 * fs / cutoff), 3 * (2 * sos.shape[0] + 1))))
+        x = signal.sosfiltfilt(sos, x, axis=1, padlen=padlen)
 
-    n_new = int(np.round((fs_new / fs) * x.shape[1]))
-    x = _downsample_filtered(x, fs, fs_new, n_new)
-    x[_decimated_nan_mask(nans, fs, fs_new, n_new)] = np.nan
+    ratio = fs / fs_new
+    if downsampling and abs(ratio - round(ratio)) < 1e-9:
+        y = x[:, ::int(round(ratio))][:, :n_new]
+        if y.shape[1] < n_new:  # cannot happen for an exact integer ratio; defensive
+            y = np.concatenate((y, np.repeat(y[:, -1:], n_new - y.shape[1], axis=1)), axis=1)
+    else:
+        band = min(1.25 * cutoff, fs / 2) / fs if apply_filter else _INTERP_MAX_BAND
+        y = _interp_exact_times(x, fs, fs_new, n_new, band)
+
+    y[_decimated_nan_mask(nans, fs, fs_new, n_new)] = np.nan
 
     if not b_multiple_signals:
-        x = x[0]
+        y = y[0]
 
     if return_datarate:
-        return x, dr
-    return x
+        return y, dr
+    return y
 
 
 def nandecimate(x, fs, fs_new, cutoff=None, datarate=False):
@@ -355,7 +442,8 @@ def unify_sampling_frequency(x : list, sampling_frequency: list, fs_new=None) ->
     - If frequencies differ and ``fs_new`` is ``None``: all signals are decimated to
       the lowest frequency present.
     - If ``fs_new`` is given: every signal whose frequency differs from ``fs_new`` is
-      decimated to ``fs_new``.
+      resampled to ``fs_new`` with :func:`decimate`, which downsamples **or upsamples**
+      (e.g. a 150 Hz channel brought to ``fs_new=200``).
 
     Signals already at the target frequency are passed through unchanged (they are
     **not** low-passed).
@@ -367,7 +455,8 @@ def unify_sampling_frequency(x : list, sampling_frequency: list, fs_new=None) ->
     sampling_frequency : list or numpy.ndarray
         Sampling frequency in Hz of each signal.
     fs_new : float, optional
-        Target sampling frequency in Hz; must not exceed any input frequency.
+        Target sampling frequency in Hz. Signals below it are upsampled, signals
+        above it are low-passed (``fs_new / 3``) and downsampled.
 
     Returns
     -------

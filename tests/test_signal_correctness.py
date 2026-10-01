@@ -98,9 +98,13 @@ def test_decimate_does_not_modify_input_and_validates():
     decimate(x, 1000, 100)
     np.testing.assert_array_equal(x, x0)
     with pytest.raises(ValueError):
-        decimate(x, 100, 1000)
+        decimate(x, 0, 100)
     with pytest.raises(ValueError):
         decimate(x, 1000, 100, cutoff=600)
+    with pytest.raises(ValueError):  # above the NEW Nyquist (50 Hz): would alias
+        decimate(x, 1000, 100, cutoff=60)
+    with pytest.raises(ValueError):
+        decimate(x, 1000, 100, cutoff=0)
 
 
 # --------------------------------------------------------------------------- nandecimate
