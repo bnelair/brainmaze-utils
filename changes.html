@@ -386,7 +386,8 @@
             </div>
             <nav aria-label="Page">
                 <ul class="pst-show_toc_level nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased-after-v2-0-0-correctness-fixes">Unreleased (after v2.0.0): correctness fixes</a><ul class="nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">Unreleased</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id1">3.0.0 (2026-10-01)</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#new-exceptions-and-warnings">New exceptions and warnings</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#signal-brainmaze-utils-signal">Signal (<code class="xref py py-mod docutils literal notranslate"><span class="pre">brainmaze_utils.signal</span></code>)</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#statistics-brainmaze-utils-stat">Statistics (<code class="xref py py-mod docutils literal notranslate"><span class="pre">brainmaze_utils.stat</span></code>)</a></li>
@@ -407,8 +408,16 @@
                   
   <section id="changes">
 <h1>Changes<a class="headerlink" href="#changes" title="Link to this heading">#</a></h1>
-<section id="unreleased-after-v2-0-0-correctness-fixes">
-<h2>Unreleased (after v2.0.0): correctness fixes<a class="headerlink" href="#unreleased-after-v2-0-0-correctness-fixes" title="Link to this heading">#</a></h2>
+<section id="unreleased">
+<h2>Unreleased<a class="headerlink" href="#unreleased" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p>Packaging: the sdist no longer ships the test suite (<code class="docutils literal notranslate"><span class="pre">tests/</span></code>); the wheel and the sdist now
+contain only the <code class="docutils literal notranslate"><span class="pre">brainmaze_utils</span></code> package (plus <code class="docutils literal notranslate"><span class="pre">LICENSE</span></code>, <code class="docutils literal notranslate"><span class="pre">README.rst</span></code> and the build
+metadata). No code changes.</p></li>
+</ul>
+</section>
+<section id="id1">
+<h2>3.0.0 (2026-10-01)<a class="headerlink" href="#id1" title="Link to this heading">#</a></h2>
 <p>These are bug fixes, but several of them <strong>change numerical results</strong>, and some calls that used
 to return (often wrong) results now raise. If you compare with results computed by v2.0.0 or
 earlier, or upgrade a pipeline, check the items below. Every behaviour change is listed; the
@@ -741,7 +750,8 @@ a clean install failed to import <code class="docutils literal notranslate"><spa
   </div>
   <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="pst-show_toc_level nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased-after-v2-0-0-correctness-fixes">Unreleased (after v2.0.0): correctness fixes</a><ul class="nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#unreleased">Unreleased</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#id1">3.0.0 (2026-10-01)</a><ul class="nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#new-exceptions-and-warnings">New exceptions and warnings</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#signal-brainmaze-utils-signal">Signal (<code class="xref py py-mod docutils literal notranslate"><span class="pre">brainmaze_utils.signal</span></code>)</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#statistics-brainmaze-utils-stat">Statistics (<code class="xref py py-mod docutils literal notranslate"><span class="pre">brainmaze_utils.stat</span></code>)</a></li>

@@ -1,8 +1,15 @@
 Changes
 -------------------
 
-Unreleased (after v2.0.0): correctness fixes
-"""""""""""""""""""""""""""""""""""""""""""""
+Unreleased
+""""""""""
+
+- Packaging: the sdist no longer ships the test suite (``tests/``); the wheel and the sdist now
+  contain only the ``brainmaze_utils`` package (plus ``LICENSE``, ``README.rst`` and the build
+  metadata). No code changes.
+
+3.0.0 (2026-10-01)
+""""""""""""""""""
 
 These are bug fixes, but several of them **change numerical results**, and some calls that used
 to return (often wrong) results now raise. If you compare with results computed by v2.0.0 or
