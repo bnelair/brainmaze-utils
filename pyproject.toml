@@ -45,11 +45,14 @@ Homepage = "https://github.com/bnelair/brainmaze-utils"
 
 [tool.setuptools.packages.find]
 where = ["."]
-# Ship only the package itself (never tests/, docs_src/, img/).
+# Ship only the package itself (never tests/, docs_src/, img/). The tests live in the
+# top-level tests/ directory, which `include` already leaves out.
 include = ["brainmaze_utils", "brainmaze_utils.*"]
-exclude = ["brainmaze_utils.tests", "brainmaze_utils.tests.*"]
 
 [tool.setuptools]
-# No package data: brainmaze_utils needs no non-Python files at runtime. The sdist is
-# trimmed the same way by MANIFEST.in.
+# No package data: brainmaze_utils needs no non-Python files at runtime (the shared artifact
+# check allows only .py/.pyi/py.typed inside the package). If a runtime data file is ever
+# added, list it under [tool.setuptools.package-data] AND in `required-assets` in
+# .github/workflows/ci.yml + release.yml; otherwise it silently drops out of the wheel
+# while the tests (which import from the source tree) still pass.
 include-package-data = false
