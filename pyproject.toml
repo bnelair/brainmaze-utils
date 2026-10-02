@@ -45,7 +45,11 @@ Homepage = "https://github.com/bnelair/brainmaze-utils"
 
 [tool.setuptools.packages.find]
 where = ["."]
-exclude = ["tests*", "docs*", "docs_src*"]
+# Ship only the package itself (never tests/, docs_src/, img/).
+include = ["brainmaze_utils", "brainmaze_utils.*"]
+exclude = ["brainmaze_utils.tests", "brainmaze_utils.tests.*"]
 
 [tool.setuptools]
-include-package-data = true
+# No package data: brainmaze_utils needs no non-Python files at runtime. The sdist is
+# trimmed the same way by MANIFEST.in.
+include-package-data = false
