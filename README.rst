@@ -10,7 +10,7 @@ This project was originally developed as a part of the `BEhavioral STate Analysi
 Documentation
 """""""""""""""
 
-Documentation is available `here <https://bnelair.github.io/brainmaze_utils>`_.
+Documentation is available `here <https://bnelair.github.io/brainmaze-utils/>`_.
 
 
 Installation
@@ -101,7 +101,7 @@ The generated documentation can be hosted separately (e.g., GitHub Pages, ReadTh
 License
 """"""""""""""""""
 
-This software is licensed under BSD-3Clause license. For details see the `LICENSE <https://github.com/bnelair/brainmaze_utils/blob/master/LICENSE>`_ file in the root directory of this project.
+This software is licensed under BSD-3Clause license. For details see the `LICENSE <https://github.com/bnelair/brainmaze-utils/blob/main/LICENSE>`_ file in the root directory of this project.
 
 
 Acknowledgment

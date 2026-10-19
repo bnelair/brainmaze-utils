@@ -41,7 +41,7 @@ def combine_gauss_distributions(mu1, std1, N1, mu2, std2, N2):
     std_combined = np.sqrt(
         (N1*std1**2 + N2*std2**2 + N1*((mu1 - mu_combined)**2) + N2*((mu2 - mu_combined)**2)) / (N1+N2)
     ) #
-    # np.sqrt((N1*(std1**2) + N2*(std2**2) + N1*N2*(mu2-mu1)**2/(N1+N2)) / (N1+N2)) # https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf - 1.4
+    # np.sqrt((N1*(std1**2) + N2*(std2**2) + N1*N2*(mu2-mu1)**2/(N1+N2)) / (N1+N2)) # (Pebay, SAND2008-6212, sec. 1.4; archived copy: https://web.archive.org/web/20190228003606/https://prod-ng.sandia.gov/techlib-noauth/access-control.cgi/2008/086212.pdf; also https://www.osti.gov/biblio/1028931)
     return mu_combined, std_combined
 
 
