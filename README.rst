@@ -10,7 +10,7 @@ This project was originally developed as a part of the `BEhavioral STate Analysi
 Documentation
 """""""""""""""
 
-Documentation is available `here <https://bnelair.github.io/brainmaze_utils>`_.
+Documentation is available `here <https://bnelair.github.io/brainmaze-utils/>`_.
 
 
 Installation
