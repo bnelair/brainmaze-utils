@@ -143,7 +143,7 @@ html_theme_options = {
     # Toc options
     'collapse_navigation': False,
     'navigation_depth': 1,
-    "repository_url": "https://github.com/bnelair/brainmaze_utils",
+    "repository_url": "https://github.com/bnelair/brainmaze-utils",
     "use_repository_button": True,
     "home_page_in_toc": True,
 }
