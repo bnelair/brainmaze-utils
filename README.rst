@@ -20,7 +20,9 @@ Installation
 
     pip install brainmaze-utils
 
-Supported dependency versions: NumPy 1.24+ (1.x and 2.x), SciPy 1.10+, pandas 2.x and 3.x.
+Supported dependency versions: NumPy 1.24+ (1.x and 2.x), SciPy 1.10+, pandas 2.x and 3.x,
+python-dateutil 2.8.2+ (2.x only: dateutil 3.0 does not work with pandas <= 3.1.0 for ``gettz()``
+zones with DST transitions; see the changelog, or use ``zoneinfo.ZoneInfo``).
 
 Signal-processing conventions
 """""""""""""""""""""""""""""""
