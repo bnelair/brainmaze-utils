@@ -428,7 +428,9 @@
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>brainmaze-utils
 </pre></div>
 </div>
-<p>Supported dependency versions: NumPy 1.24+ (1.x and 2.x), SciPy 1.10+, pandas 2.x and 3.x.</p>
+<p>Supported dependency versions: NumPy 1.24+ (1.x and 2.x), SciPy 1.10+, pandas 2.x and 3.x,
+python-dateutil 2.8.2+ (2.x only: dateutil 3.0 does not work with pandas &lt;= 3.1.0 for <code class="docutils literal notranslate"><span class="pre">gettz()</span></code>
+zones with DST transitions; see the changelog, or use <code class="docutils literal notranslate"><span class="pre">zoneinfo.ZoneInfo</span></code>).</p>
 </section>
 <section id="signal-processing-conventions">
 <h2>Signal-processing conventions<a class="headerlink" href="#signal-processing-conventions" title="Link to this heading">#</a></h2>

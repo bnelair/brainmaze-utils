@@ -414,6 +414,17 @@
 <li><p>Packaging: the sdist no longer ships the test suite (<code class="docutils literal notranslate"><span class="pre">tests/</span></code>); the wheel and the sdist now
 contain only the <code class="docutils literal notranslate"><span class="pre">brainmaze_utils</span></code> package (plus <code class="docutils literal notranslate"><span class="pre">LICENSE</span></code>, <code class="docutils literal notranslate"><span class="pre">README.rst</span></code> and the build
 metadata). No code changes.</p></li>
+<li><p>Packaging: <code class="docutils literal notranslate"><span class="pre">python-dateutil&gt;=2.8.2,&lt;3</span></code>. python-dateutil 3.0.0 (2026-10-21) is not compatible
+with pandas &lt;= 3.1.0 (pandas GH#71459). With it, <code class="docutils literal notranslate"><span class="pre">dateutil.tz.gettz()</span></code> zones that have DST
+transitions (e.g. <code class="docutils literal notranslate"><span class="pre">gettz('America/Chicago')</span></code>) break inside pandas: pandas 3.x raises
+<code class="docutils literal notranslate"><span class="pre">AttributeError:</span> <span class="pre">'NoneType'</span> <span class="pre">object</span> <span class="pre">has</span> <span class="pre">no</span> <span class="pre">attribute</span> <span class="pre">'total_seconds'</span></code> (e.g. in
+<code class="docutils literal notranslate"><span class="pre">time_to_timezone</span></code>), and on pandas 2.x a scalar <code class="docutils literal notranslate"><span class="pre">Timestamp.tz_convert</span></code> silently returns a
+tz-naive UTC time. Fixed-offset zones, <code class="docutils literal notranslate"><span class="pre">tzutc()</span></code> and <code class="docutils literal notranslate"><span class="pre">tzlocal()</span></code> (the defaults) are not
+affected. No code or result changes with dateutil 2.x. If you need dateutil 3, pass
+<code class="docutils literal notranslate"><span class="pre">zoneinfo.ZoneInfo('America/Chicago')</span></code> instead of <code class="docutils literal notranslate"><span class="pre">gettz(...)</span></code>: the instants are the same,
+but the column dtype shows <code class="docutils literal notranslate"><span class="pre">America/Chicago</span></code> instead of <code class="docutils literal notranslate"><span class="pre">tzfile(...)</span></code>, and a wall-clock time
+that falls inside a DST gap (nonexistent local time) maps to a different UTC instant. The bound
+will be lifted only together with a pandas floor that contains the fix (expected pandas 3.1.1).</p></li>
 </ul>
 </section>
 <section id="id1">

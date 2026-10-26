@@ -7,6 +7,17 @@ Unreleased
 - Packaging: the sdist no longer ships the test suite (``tests/``); the wheel and the sdist now
   contain only the ``brainmaze_utils`` package (plus ``LICENSE``, ``README.rst`` and the build
   metadata). No code changes.
+- Packaging: ``python-dateutil>=2.8.2,<3``. python-dateutil 3.0.0 (2026-10-21) is not compatible
+  with pandas <= 3.1.0 (pandas GH#71459). With it, ``dateutil.tz.gettz()`` zones that have DST
+  transitions (e.g. ``gettz('America/Chicago')``) break inside pandas: pandas 3.x raises
+  ``AttributeError: 'NoneType' object has no attribute 'total_seconds'`` (e.g. in
+  ``time_to_timezone``), and on pandas 2.x a scalar ``Timestamp.tz_convert`` silently returns a
+  tz-naive UTC time. Fixed-offset zones, ``tzutc()`` and ``tzlocal()`` (the defaults) are not
+  affected. No code or result changes with dateutil 2.x. If you need dateutil 3, pass
+  ``zoneinfo.ZoneInfo('America/Chicago')`` instead of ``gettz(...)``: the instants are the same,
+  but the column dtype shows ``America/Chicago`` instead of ``tzfile(...)``, and a wall-clock time
+  that falls inside a DST gap (nonexistent local time) maps to a different UTC instant. The bound
+  will be lifted only together with a pandas floor that contains the fix (expected pandas 3.1.1).
 
 3.0.0 (2026-10-01)
 """"""""""""""""""
